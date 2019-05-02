@@ -8,7 +8,7 @@
 
 #include <wayland-client.h>
 
-#include "protocol/xdg-shell-client.h"
+#include "xdg-shell-client.h"
 #include "macro.h"
 #include "utils.h"
 

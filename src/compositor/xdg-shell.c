@@ -5,7 +5,7 @@
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 
-#include "protocol/xdg-shell-server.h"
+#include "xdg-shell-server.h"
 
 #include "macro.h"
 #include "wl-server.h"

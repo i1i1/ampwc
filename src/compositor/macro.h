@@ -40,6 +40,7 @@ do { 								\
 #  ifndef LOG_LEVEL
 #    define LOG_LEVEL log_verbose
 #  endif
+
 #  define debug(fmt, arg...) 					\
    do {								\
 	_int_logit(stdout, "[+] ", fmt, ##arg);			\
@@ -51,11 +52,40 @@ do { 								\
 		_int_logit(stdout, "[+] ", fmt, ##arg);		\
 	   }							\
    } while (0)
-#else
+#else //NDEBUG
 
 # define debug(fmt, arg...)
 # define debugv(loglvl, fmt, arg...)
-#endif
+#endif //NDEBUG
 
-#endif
+#define xmalloc(size)				\
+({						\
+	void *ret;				\
+						\
+	errno = 0;				\
+	ret = malloc(size);			\
+	if (size != 0 && ret == NULL) {		\
+		perror("malloc()");		\
+						\
+		exit(EXIT_FAILURE);		\
+	}					\
+	ret;					\
+})
+
+#define xrealloc(p, size)			\
+({						\
+      void *ret;				\
+						\
+      errno = 0;				\
+      ret = realloc(p, size);			\
+      if (size != 0 && ret == NULL) {		\
+	  perror("realloc()");			\
+						\
+	  exit(EXIT_FAILURE);			\
+      }						\
+						\
+      ret;					\
+})
+
+#endif //_MACRO_H_
 

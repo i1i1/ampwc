@@ -11,10 +11,10 @@
 #include "seat.h"
 #include "wl-server.h"
 #include "xdg-shell.h"
-
-//TODO WRITE xmalloc
+#include "drm.h"
 
 struct amcs_compositor compositor_ctx;
+static struct amcs_drm_card *drm_card;
 
 struct amcs_surface *
 amcs_surface_new()
@@ -230,12 +230,12 @@ amcs_compositor_init(struct amcs_compositor *ctx)
 	}
 	debug("event loop %p", ctx->evloop);
 
+
 	debug("drm init");
 
-	/*
-	drm_init(&dev);
-	drm_configure(&dev);
-	*/
+        drm_card = amcs_drm_init("/dev/dri/card0");
+
+
 	wl_display_init_shm(ctx->display);
 
 	debug("compositor iface version %d", wl_compositor_interface.version);
