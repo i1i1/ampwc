@@ -20,7 +20,7 @@ all: build
 build: $(TARGETS)
 
 wlserv: $(WL_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ `pkg-config --libs wayland-server libdrm`
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm `pkg-config --libs wayland-server libdrm`
 
 wlclient: $(WLC_OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ `pkg-config --libs wayland-client`

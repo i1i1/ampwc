@@ -5,3 +5,4 @@ wlserv
 protocol/xdg-shell-client.h
 protocol/xdg-shell-server.h
 protocol/xdg-shell.c
+tags

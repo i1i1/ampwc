@@ -1,6 +1,10 @@
 #ifndef _MACRO_H_
 #define _MACRO_H_
 
+#include <stdlib.h>
+#include <errno.h>
+#include <stdio.h>
+
 #define ARRSZ(arr) (sizeof(arr) / sizeof(arr[0]))
 
 #define CRLF	"\r\n"
@@ -69,22 +73,23 @@ do { 								\
 						\
 		exit(EXIT_FAILURE);		\
 	}					\
+						\
 	ret;					\
 })
 
 #define xrealloc(p, size)			\
 ({						\
-      void *ret;				\
+	void *ret;				\
 						\
-      errno = 0;				\
-      ret = realloc(p, size);			\
-      if (size != 0 && ret == NULL) {		\
-	  perror("realloc()");			\
+	errno = 0;				\
+	ret = realloc(p, size);			\
+	if (size != 0 && ret == NULL) {		\
+		perror("realloc()");		\
 						\
-	  exit(EXIT_FAILURE);			\
-      }						\
+		exit(EXIT_FAILURE);		\
+	}					\
 						\
-      ret;					\
+	ret;					\
 })
 
 #endif //_MACRO_H_

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include <wayland-server.h>
 #include <wayland-server-core.h>
@@ -11,10 +12,12 @@
 #include "seat.h"
 #include "wl-server.h"
 #include "xdg-shell.h"
-#include "drm.h"
+
+#include "windows.h"
+#include "tty.h"
 
 struct amcs_compositor compositor_ctx;
-static struct amcs_drm_card *drm_card;
+static amcs_screen *screens;
 
 struct amcs_surface *
 amcs_surface_new()
@@ -196,6 +199,32 @@ bind_compositor(struct wl_client *client, void *data, uint32_t version, uint32_t
 				       data, NULL);
 }
 
+static void
+start_draw(void)
+{
+	screens = amcs_wind_get_screens("/dev/dri/card0");
+
+/*
+	if ((errno = pthread_create(&draw_thread, NULL, draw, NULL)) != 0)
+		perror_and_ret(, "pthread_create()");
+
+	return;
+*/
+}
+
+static void
+stop_draw(void)
+{
+/*
+	if ((errno = pthread_cancel(draw_thread)) != 0)
+		perror_and_ret(, "pthread_cancel()");
+
+	if ((errno = pthread_join(draw_thread, NULL)) != 0)
+		perror_and_ret(, "pthread_join()");
+*/
+	amcs_wind_free_screens(screens);
+}
+
 int
 amcs_compositor_init(struct amcs_compositor *ctx)
 {
@@ -229,12 +258,6 @@ amcs_compositor_init(struct amcs_compositor *ctx)
 		goto finalize;
 	}
 	debug("event loop %p", ctx->evloop);
-
-
-	debug("drm init");
-
-        drm_card = amcs_drm_init("/dev/dri/card0");
-
 
 	wl_display_init_shm(ctx->display);
 
@@ -270,7 +293,6 @@ amcs_compositor_deinit(struct amcs_compositor *ctx)
 		wl_display_destroy(ctx->display);
 	if (ctx->comp)
 		wl_global_destroy(ctx->comp);
-	//drm_finalize(&dev);
 }
 
 int
@@ -278,17 +300,23 @@ main(int argc, const char *argv[])
 {
 	int rc;
 
-	if (amcs_compositor_init(&compositor_ctx) != 0) {
+	debug("tty init");
+	awc_tty_open(0);
+	awc_tty_sethand(start_draw, stop_draw);
+	awc_tty_activate();
+
+	if (amcs_compositor_init(&compositor_ctx) != 0)
 		return 1;
-	}
 
 	debug("event loop dispatch");
 	while (1) {
 		rc = wl_event_loop_dispatch(compositor_ctx.evloop, 2000);
-		if (rc < 0) {
+
+		if (rc < 0 && errno != EINTR) {
 			warning("error at loop dispatch\n");
 			break;
 		}
+
 		wl_signal_emit(&compositor_ctx.redraw_sig, &compositor_ctx);
 		//debug("evloop rc = %d\n", rc);
 
