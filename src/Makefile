@@ -1,5 +1,7 @@
 CFLAGS  = -Wall -ggdb
 LDFLAGS =
+SERV_FLAGS = -lm -pthread `pkg-config --libs wayland-server libdrm libudev`
+CLIENT_FLAGS = `pkg-config --libs wayland-client`
 
 XDG_PROTO = protocol/xdg-shell.xml
 
@@ -20,10 +22,10 @@ all: build
 build: $(TARGETS)
 
 wlserv: $(WL_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ -lm `pkg-config --libs wayland-server libdrm`
+	$(CC) $(CFLAGS) $(LDFLAGS) $(SERV_FLAGS) -o $@ $^
 
 wlclient: $(WLC_OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ `pkg-config --libs wayland-client`
+	$(CC) $(CFLAGS) $(LDFLAGS) $(CLIENT_FLAGS) -o $@ $^
 
 
 compositor/%.o: compositor/%.c $(wl_proto)

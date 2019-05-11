@@ -1,8 +1,18 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "udev.h"
 #include "windows.h"
 #include "macro.h"
+
+static void
+update_screen_state(const char *name, int status)
+{
+	if (status)
+		debug("EVENT: %s: connected", name);
+	else
+		debug("EVENT: %s: disconnected", name);
+}
 
 amcs_screen*
 amcs_wind_get_screens(const char *path)
@@ -10,7 +20,11 @@ amcs_wind_get_screens(const char *path)
 	amcs_drm_card *card;
 	amcs_drm_dev *dev_list;
 	amcs_screen *screen, *screens;
+	amcs_monitors *monitors;
 
+
+	monitors = amcs_udev_get_monitors();
+	amcs_udev_monitor_tracking(update_screen_state);
 
 	screens = screen = xmalloc(sizeof (amcs_screen));
 	card = amcs_drm_init(path);
