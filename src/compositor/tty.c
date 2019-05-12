@@ -108,7 +108,7 @@ awc_tty_open(unsigned int num)
 
 	free(str);
 
-	debug("Open terminal: %s\n", path);
+	debug("Open terminal: %s", path);
 	if ((dev->fd = open(path, O_RDWR | O_CLOEXEC)) < 0) {
 		perror("open(path, O_RDWR | O_CLOEXEC)");
 		exit(1);

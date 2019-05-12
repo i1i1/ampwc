@@ -89,7 +89,7 @@ surf_attach(struct wl_client *client, struct wl_resource *resource,
 
 	debug("resource %p, buffer %p, (x; y) (%d; %d)", resource, buffer, x, y);
 	if (!buffer) {
-		warning("buffer == NULL!!!\n");
+		warning("buffer == NULL!!!");
 		return;
 	}
 	mysurf->pending.buf = wl_shm_buffer_get(buffer);
@@ -313,12 +313,12 @@ main(int argc, const char *argv[])
 		rc = wl_event_loop_dispatch(compositor_ctx.evloop, 2000);
 
 		if (rc < 0 && errno != EINTR) {
-			warning("error at loop dispatch\n");
+			warning("error at loop dispatch");
 			break;
 		}
 
 		wl_signal_emit(&compositor_ctx.redraw_sig, &compositor_ctx);
-		//debug("evloop rc = %d\n", rc);
+		//debug("evloop rc = %d", rc);
 
 		wl_display_flush_clients(compositor_ctx.display);
 	}

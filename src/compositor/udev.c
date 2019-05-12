@@ -26,16 +26,16 @@ amcs_udev_get_monitors(void)
 
 
 	if ((udev = udev_new()) == NULL)
-		error(1, "Can not create udev object.\n");
+		error(1, "Can not create udev object.");
 
 	if ((udev_enum = udev_enumerate_new(udev)) == NULL )
-		error(1, "Can not create unumerate object\n");
+		error(1, "Can not create unumerate object");
 
 	udev_enumerate_add_match_subsystem(udev_enum, "drm");
 	udev_enumerate_scan_devices(udev_enum);
 
 	if ((udev_list = udev_enumerate_get_list_entry(udev_enum)) == NULL)
-		error(1, "Can not get dev list\n");
+		error(1, "Can not get dev list");
 
 	monitors = NULL;
 
@@ -105,7 +105,7 @@ monitor_tracking(void *update_status)
 
 
 	if ((udev = udev_new()) == NULL)
-		error(1, "Can not create udev object.\n");
+		error(1, "Can not create udev object.");
 
 	udev_mon = udev_monitor_new_from_netlink(udev, "udev");
 
@@ -138,6 +138,7 @@ amcs_udev_monitor_tracking(void (*update_status)(const char *name, int status))
 {
 	pthread_t thread;
 	pthread_attr_t attr;
+
 
 	if (pthread_attr_init(&attr))
 		goto thread_error;
