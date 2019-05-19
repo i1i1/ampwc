@@ -62,35 +62,36 @@ do { 								\
 # define debugv(loglvl, fmt, arg...)
 #endif //NDEBUG
 
-#define xmalloc(size)				\
-({						\
-	void *ret;				\
-						\
-	errno = 0;				\
-	ret = malloc(size);			\
-	if (size != 0 && ret == NULL) {		\
-		perror("malloc()");		\
-						\
-		exit(EXIT_FAILURE);		\
-	}					\
-						\
-	ret;					\
-})
+static inline void*
+xmalloc(size_t size)
+{
+	void *ret;
 
-#define xrealloc(p, size)			\
-({						\
-	void *ret;				\
-						\
-	errno = 0;				\
-	ret = realloc(p, size);			\
-	if (size != 0 && ret == NULL) {		\
-		perror("realloc()");		\
-						\
-		exit(EXIT_FAILURE);		\
-	}					\
-						\
-	ret;					\
-})
+	errno = 0;
+	ret = malloc(size);
+	if (size != 0 && ret == NULL) {
+		perror("malloc()");
+
+		exit(EXIT_FAILURE);
+	}
+
+	return ret;
+}
+
+static inline void*
+xrealloc(void *ptr, size_t size)
+{
+	void *ret;
+
+	ret = realloc(ptr, size);
+	if (size != 0 && ret == NULL) {
+		perror("realloc()");
+
+		exit(EXIT_FAILURE);
+	}
+
+	return ret;
+}
 
 #endif //_MACRO_H_
 

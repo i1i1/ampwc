@@ -13,6 +13,7 @@
 #include "wl-server.h"
 #include "xdg-shell.h"
 
+#include "udev.h"
 #include "windows.h"
 #include "tty.h"
 
@@ -202,7 +203,39 @@ bind_compositor(struct wl_client *client, void *data, uint32_t version, uint32_t
 static void
 start_draw(void)
 {
-	screens = amcs_wind_get_screens("/dev/dri/card0");
+	int i;
+	int len;
+	char *path;
+	const char **cards;
+	amcs_screen *screen;
+	amcs_wind *wind;
+
+
+	cards = amcs_udev_get_cardnames();
+
+	for (i = 0; cards[i] != NULL; ++i) {
+		len = strlen(DRIPATH) + strlen(cards[i]) + 1;
+		path = xmalloc(len);
+
+		len = strlen(DRIPATH) + strlen(cards[i]) + 1;
+		strcpy(path, DRIPATH);
+		strcpy(path + strlen(DRIPATH), cards[i]);
+
+		screen = amcs_wind_get_screens(path);
+		screens = amcs_wind_merge_screen_lists(screens, screen);
+		free(path);
+
+		if (screen == NULL)
+			continue;
+
+		wind = amcs_wind_get_root(screen);
+		amcs_wind_split(wind, VSPLIT);
+	}
+
+	if (screens == NULL)
+		error(1, "screens not found");
+
+	amcs_udev_free_cardnames(cards);
 
 /*
 	if ((errno = pthread_create(&draw_thread, NULL, draw, NULL)) != 0)
@@ -223,6 +256,7 @@ stop_draw(void)
 		perror_and_ret(, "pthread_join()");
 */
 	amcs_wind_free_screens(screens);
+	screens = NULL;
 }
 
 int
@@ -301,9 +335,9 @@ main(int argc, const char *argv[])
 	int rc;
 
 	debug("tty init");
-	awc_tty_open(0);
-	awc_tty_sethand(start_draw, stop_draw);
-	awc_tty_activate();
+	amcs_tty_open(0);
+	amcs_tty_sethand(start_draw, stop_draw);
+	amcs_tty_activate();
 
 	if (amcs_compositor_init(&compositor_ctx) != 0)
 		return 1;

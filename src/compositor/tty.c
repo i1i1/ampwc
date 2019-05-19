@@ -4,6 +4,8 @@
 #include <string.h>
 #include <signal.h>
 #include <math.h>
+#include <pthread.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -14,17 +16,20 @@
 #include "tty.h"
 #include "macro.h"
 
+
 typedef struct tty_dev {
 	int fd;
 	int num;
 	char *path;
+	int state;
 } tty_dev;
 
 
 static void (*extern_acquisition) (void);
 static void (*extern_release) (void);
-
 static tty_dev *dev;
+static pthread_mutex_t signal_mux;
+
 
 static char*
 uitoa(unsigned int n)
@@ -55,19 +60,35 @@ uitoa(unsigned int n)
 static void
 tty_acquisition(int sig)
 {
-	extern_acquisition();
-	ioctl(dev->fd, VT_RELDISP, VT_ACKACQ);
+	if (pthread_mutex_trylock(&signal_mux))
+		return;
+
+	if (dev->state == 0) {
+		dev->state = 1;
+		ioctl(dev->fd, VT_RELDISP, VT_ACKACQ);
+		extern_acquisition();
+	}
+
+	pthread_mutex_unlock(&signal_mux);
 }
 
 static void
 tty_release(int sig)
 {
-	extern_release();
-	ioctl(dev->fd, VT_RELDISP, 1);
+	if (pthread_mutex_trylock(&signal_mux))
+		return;
+
+	if (dev->state == 1) {
+		dev->state = 0;
+		extern_release();
+		ioctl(dev->fd, VT_RELDISP, 1);
+	}
+
+	pthread_mutex_unlock(&signal_mux);
 }
 
 void
-awc_tty_open(unsigned int num)
+amcs_tty_open(unsigned int num)
 {
 	int fd;
 	size_t size;
@@ -78,6 +99,11 @@ awc_tty_open(unsigned int num)
 	size = sizeof (tty_dev);
 	dev = xmalloc(size);
 	dev = memset(dev, 0, size);
+
+	if (pthread_mutex_init(&signal_mux, NULL) != 0) {
+		perror("amcs_tty_open()");
+		exit(1);
+	}
 
 	if (num == 0) {
 		if ((fd = open("/dev/tty1", O_RDWR | O_NOCTTY)) < 0) {
@@ -116,10 +142,12 @@ awc_tty_open(unsigned int num)
 }
 
 void
-awc_tty_sethand(void (*ext_acq) (void), void (*ext_rel) (void))
+amcs_tty_sethand(void (*ext_acq) (void), void (*ext_rel) (void))
 {
 	struct vt_mode mode;
 
+
+	assert(ext_acq && ext_rel);
 
 	extern_acquisition = ext_acq;
 	extern_release = ext_rel;
@@ -151,7 +179,7 @@ awc_tty_sethand(void (*ext_acq) (void), void (*ext_rel) (void))
 }
 
 void
-awc_tty_activate(void)
+amcs_tty_activate(void)
 {
 	debug("Activating terminal");
 

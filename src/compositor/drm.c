@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <assert.h>
 
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -14,6 +15,24 @@
 
 #define DEPTH 24
 #define BPP 32
+
+
+struct amcs_drm_dev {
+	uint8_t *buf;
+	uint32_t conn_id, enc_id, crtc_id, fb_id;
+	uint32_t w, h;
+	uint32_t pitch, size, handle;
+	drmModeModeInfo mode;
+
+	amcs_drm_dev_list *next;
+};
+
+struct amcs_drm_card {
+	const char *path;
+	int fd;
+
+	amcs_drm_dev_list *list;
+};
 
 
 static int
@@ -29,8 +48,6 @@ dumb_is_supported(int fd)
 
 	if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &dumb) < 0 || dumb == 0)
 		return 0;
-
-	debug("Dumb buffer is supported");
 
 	return 1;
 }
@@ -54,8 +71,6 @@ drm_setFB(int fd, amcs_drm_dev *dev)
 	dev->pitch = creq.pitch;
 	dev->size = creq.size;
 	dev->handle = creq.handle;
-
-	debug("\tpitch: %d, size: %d, handle: %d", creq.pitch, (int)creq.size, creq.handle);
 
 	if (drmModeAddFB(fd, dev->w, dev->h, DEPTH, BPP, dev->pitch,
 			 dev->handle, &dev->fb_id))
@@ -83,6 +98,7 @@ amcs_drm_card*
 amcs_drm_init(const char *path)
 {
 	int i;
+	int fd;
 
 	amcs_drm_card *card;
 	amcs_drm_dev *dev_list;
@@ -92,30 +108,39 @@ amcs_drm_init(const char *path)
 	drmModeEncoder *enc;
 
 
+	assert(path);
+
 	debug("Init dev: %s", path);
+
+	if ((fd = open(path, O_RDWR)) < 0) {
+		perror("amcs_drm_init()");
+
+		return NULL;
+	}
+
+	if (!dumb_is_supported(fd)) {
+		debug("dumb buffer is not supported for device: %s", path);
+		close(fd);
+
+		return NULL;
+	}
+
+	if ((res = drmModeGetResources(fd)) == NULL) {
+		debug("error getting drm resources for device: %s", path);
+		close(fd);
+
+		return NULL;
+	}
+
+
 	card = xmalloc(sizeof (amcs_drm_card));
 	card->path = path;
-
-	if ((card->fd = open(path, O_RDWR)) < 0) {
-		free(card);
-		error(1, "Can not open device: %s", path);
-	}
-
-	if (!dumb_is_supported(card->fd)) {
-		free(card);
-		error(1, "dumb buffer is not supported");
-	}
-
-	if ((res = drmModeGetResources(card->fd)) == NULL) {
-		free(card);
-		error(1, "error getting drm resources");
-	}
-
+	card->fd = fd;
 
 	debug("Count connectors: %d", res->count_connectors);
 
 	for (i = 0; i < res->count_connectors; ++i) {
-		conn = drmModeGetConnector(card->fd, res->connectors[i]);
+		conn = drmModeGetConnector(fd, res->connectors[i]);
 
 		if (conn == NULL)
 			continue;
@@ -123,7 +148,7 @@ amcs_drm_init(const char *path)
 		if (conn->connection != DRM_MODE_CONNECTED || conn->count_modes <= 0)
 			goto free_connector;
 
-		enc = drmModeGetEncoder(card->fd, conn->encoder_id);
+		enc = drmModeGetEncoder(fd, conn->encoder_id);
 		if (enc == NULL)
 			goto free_connector;
 
@@ -145,23 +170,67 @@ amcs_drm_init(const char *path)
 		dev_list->w = conn->modes[0].hdisplay;
 		dev_list->h = conn->modes[0].vdisplay;
 
-		debug("\tconn id: %d", dev_list->conn_id);
-		debug("\tenc id: %d", dev_list->enc_id);
-		debug("\tcrtc id: %d", dev_list->crtc_id);
-		debug("\tmode: %dx%d", dev_list->w, dev_list->h);
+		drm_setFB(fd, dev_list);
 
-		drm_setFB(card->fd, dev_list);
+		debug("    conn id: %d", dev_list->conn_id);
+		debug("    enc id: %d", dev_list->enc_id);
+		debug("    crtc id: %d", dev_list->crtc_id);
+		debug("    mode: %dx%d", dev_list->w, dev_list->h);
+		debug("    pitch: %d, size: %d, handle: %d",
+		      dev_list->pitch, dev_list->size, dev_list->handle);
 
 		drmModeFreeEncoder(enc);
 
 free_connector:
 		drmModeFreeConnector(conn);
-		debug("\t____________________");
+		debug("    ____________________");
 	}
 
 	drmModeFreeResources(res);
 
 	return card;
+}
+
+amcs_drm_dev_list*
+amcs_drm_get_devlist(amcs_drm_card *card)
+{
+	assert(card);
+	return card->list;
+}
+
+uint8_t*
+amcs_drm_get_buf(amcs_drm_dev *dev)
+{
+	assert(dev);
+	return dev->buf;
+}
+
+int32_t
+amcs_drm_get_pitch(amcs_drm_dev *dev)
+{
+	assert(dev);
+	return dev->pitch;
+}
+
+int32_t
+amcs_drm_get_width(amcs_drm_dev *dev)
+{
+	assert(dev);
+	return dev->w;
+}
+
+int32_t
+amcs_drm_get_height(amcs_drm_dev *dev)
+{
+	assert(dev);
+	return dev->h;
+}
+
+amcs_drm_dev_list*
+amcs_drm_get_nextentry(amcs_drm_dev_list *dev)
+{
+	assert(dev);
+	return dev->next;
 }
 
 void
@@ -170,6 +239,8 @@ amcs_drm_free(amcs_drm_card *card)
 	amcs_drm_dev *dev, *dev_list;
 	struct drm_mode_destroy_dumb dreq;
 
+
+	assert(card);
 
 	for (dev_list = card->list; dev_list != NULL;) {
 		munmap(dev_list->buf, dev_list->size);

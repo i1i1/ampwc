@@ -7,24 +7,23 @@
 #include <sys/types.h>
 
 
-typedef struct amcs_drm_dev {
-	uint8_t *buf;
-	uint32_t conn_id, enc_id, crtc_id, fb_id;
-	uint32_t w, h;
-	uint32_t pitch, size, handle;
-	drmModeModeInfo mode;
+#define DRIPATH "/dev/dri/"
 
-	struct amcs_drm_dev *next;
-} amcs_drm_dev;
 
-typedef struct amcs_drm_card {
-	const char *path;
-	int fd;
+typedef struct amcs_drm_card amcs_drm_card;
+typedef struct amcs_drm_dev amcs_drm_dev_list;
+typedef struct amcs_drm_dev amcs_drm_dev;
 
-	amcs_drm_dev *list;
-} amcs_drm_card;
 
 amcs_drm_card *amcs_drm_init(const char *path);
-void amcs_drm_free(amcs_drm_card *dev);
+
+amcs_drm_dev_list *amcs_drm_get_devlist(amcs_drm_card *card);
+uint8_t *amcs_drm_get_buf(amcs_drm_dev *dev);
+int32_t amcs_drm_get_pitch(amcs_drm_dev *dev);
+int32_t amcs_drm_get_width(amcs_drm_dev *dev);
+int32_t amcs_drm_get_height(amcs_drm_dev *dev);
+amcs_drm_dev_list *amcs_drm_get_nextentry(amcs_drm_dev_list *dev);
+
+void amcs_drm_free(amcs_drm_card *card);
 
 #endif // _AMCS_DRM_H

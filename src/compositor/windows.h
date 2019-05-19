@@ -5,33 +5,20 @@
 
 #include "drm.h"
 
-enum splittypes {
-	HSPLIT,
+
+enum stypes {
+	HSPLIT = 1,
 	VSPLIT,
-	NOSPLIT,
 };
 
-typedef struct amcs_wind {
-	int splittype;
-	int w, h;
-	int x, y;
-	uint32_t *buf;
+typedef struct amcs_wind amcs_wind;
+typedef struct amcs_screen amcs_screen;
+typedef struct amcs_screen amcs_screen_list;
 
-	struct amcs_wind *parent;
-	struct amcs_wind *subwind;
-} amcs_wind;
 
-typedef struct amcs_screen {
-	int w, h;
-	int pitch;
-	amcs_wind *root;
-	uint8_t *buf;
-	amcs_drm_card *card;
-
-	struct amcs_screen *next;
-} amcs_screen;
-
-amcs_screen *amcs_wind_get_screens(const char *path);
+amcs_screen_list *amcs_wind_get_screens(const char *path);
+amcs_screen_list *amcs_wind_merge_screen_lists(amcs_screen_list *dst,
+					       amcs_screen_list *src);
 
 amcs_wind *amcs_wind_get_root(amcs_screen *screen);
 amcs_wind *amcs_wind_get_parent(amcs_wind *wind);
@@ -40,12 +27,12 @@ amcs_wind *amcs_wind_get_brother(amcs_wind *wind);
 int amcs_wind_get_width(amcs_wind *wind);
 int amcs_wind_get_height(amcs_wind *wind);
 
-int amcs_wind_setbuf(amcs_wind *wind, uint32_t *buf);
+void amcs_wind_setbuf(amcs_wind *wind, uint32_t *buf);
 uint32_t *amcs_wind_getbuf(amcs_wind *wind);
-int amcs_wind_swapbuf(amcs_screen *screen, amcs_wind *wind);
+void amcs_wind_commit_buf(amcs_screen *screen);
 
 amcs_wind *amcs_wind_split(amcs_wind *wind, int splittype);
 
-void amcs_wind_free_screens(amcs_screen *screens);
+void amcs_wind_free_screens(amcs_screen_list *screens);
 
 #endif // _AWC_WINDOWS_H
