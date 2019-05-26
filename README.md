@@ -16,5 +16,6 @@ Running
 Dependencies
 ------------
 
-* Wayland
-* drm
+* Wayland libs
+* libdrm
+* libudev
