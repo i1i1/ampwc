@@ -14,6 +14,7 @@ struct amcs_wind {
 	int w, h;
 	int x, y;
 	uint32_t *buf;
+	amcs_screen *screen;
 
 	amcs_wind *parent;
 	amcs_wind *subwind[2];
@@ -82,6 +83,7 @@ amcs_wind_get_screens(const char *path)
 		screen->root->parent = NULL;
 		screen->root->subwind[0] = NULL;
 		screen->root->subwind[1] = NULL;
+		screen->root->screen = screen;
 
 		if ((dev_list = amcs_drm_get_nextentry(dev_list)) == NULL)
 			break;
@@ -200,34 +202,55 @@ amcs_wind_get_height(amcs_wind *wind)
 amcs_wind*
 amcs_wind_split(amcs_wind *wind, int stype)
 {
+	amcs_wind *new_wind;
+
+
 	assert(stype == VSPLIT || stype == HSPLIT);
 	assert(wind);
 
-	wind->stype = stype;
-	wind->subwind[0] = xmalloc(sizeof (amcs_wind));
-	wind->subwind[1] = xmalloc(sizeof (amcs_wind));
+	new_wind = xmalloc(sizeof (amcs_wind));
 
-	wind->subwind[0]->stype = NOSPLIT;
-	wind->subwind[0]->h = (stype == HSPLIT) ? wind->h/2 : wind->h;
-	wind->subwind[0]->w = (stype == VSPLIT) ? wind->w/2 : wind->w;
-	wind->subwind[0]->y = wind->y;
-	wind->subwind[0]->x = wind->x;
-	wind->subwind[0]->buf = NULL;
-	wind->subwind[0]->parent = wind;
-	wind->subwind[0]->subwind[0] = NULL;
-	wind->subwind[0]->subwind[1] = NULL;
+	if (wind->parent == NULL)
+		wind->screen->root = new_wind;
+	else {
+		if (wind->parent->subwind[0] == wind)
+			wind->parent->subwind[0] = new_wind;
+		else
+			wind->parent->subwind[1] = new_wind;
+	}
 
-	wind->subwind[1]->stype = NOSPLIT;
-	wind->subwind[1]->h = wind->h - ((stype == HSPLIT) ? wind->subwind[0]->h : 0);
-	wind->subwind[1]->w = wind->w - ((stype == VSPLIT) ? wind->subwind[0]->w : 0);
-	wind->subwind[1]->y = wind->y + ((stype == HSPLIT) ? wind->h/2 : 0);
-	wind->subwind[1]->x = wind->x + ((stype == VSPLIT) ? wind->w/2 : 0);
-	wind->subwind[1]->buf = NULL;
-	wind->subwind[1]->parent = wind;
-	wind->subwind[1]->subwind[0] = NULL;
-	wind->subwind[1]->subwind[1] = NULL;
+	new_wind->stype = stype;
+	new_wind->w = wind->w;
+	new_wind->h = wind->h;
+	new_wind->x = wind->x;
+	new_wind->y = wind->y;
+	new_wind->buf = NULL;
+	new_wind->screen = wind->screen;
+	new_wind->parent = wind->parent;
+	new_wind->subwind[0] = wind;
+	new_wind->subwind[1] = xmalloc(sizeof (amcs_wind));
 
-	return wind->subwind[0];
+	wind->h = (stype == HSPLIT) ? wind->h/2 : wind->h;
+	wind->w = (stype == VSPLIT) ? wind->w/2 : wind->w;
+	wind->parent = new_wind;
+	// TODO: call changing window size handler
+
+	new_wind = new_wind->subwind[1];
+
+	new_wind->stype = NOSPLIT;
+	new_wind->w = wind->parent->w - ((stype == VSPLIT) ? wind->w : 0);
+	new_wind->h = wind->parent->h - ((stype == HSPLIT) ? wind->h : 0);
+	new_wind->x = wind->parent->x + ((stype == VSPLIT) ?
+					  wind->parent->x/2 : 0);
+	new_wind->y = wind->parent->y + ((stype == HSPLIT) ?
+					  wind->parent->y/2 : 0);
+	new_wind->buf = NULL;
+	new_wind->screen = wind->screen;
+	new_wind->parent = wind->parent;
+	new_wind->subwind[0] = NULL;
+	new_wind->subwind[1] = NULL;
+
+	return new_wind;
 }
 
 static void

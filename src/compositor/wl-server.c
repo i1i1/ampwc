@@ -229,6 +229,7 @@ start_draw(void)
 			continue;
 
 		wind = amcs_wind_get_root(screen);
+		wind = amcs_wind_split(wind, VSPLIT);
 		amcs_wind_split(wind, VSPLIT);
 	}
 
