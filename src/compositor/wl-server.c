@@ -208,7 +208,6 @@ start_draw(void)
 	char *path;
 	const char **cards;
 	amcs_screen *screen;
-	amcs_wind *wind;
 
 
 	cards = amcs_udev_get_cardnames();
@@ -227,16 +226,58 @@ start_draw(void)
 
 		if (screen == NULL)
 			continue;
-
-		wind = amcs_wind_get_root(screen);
-		wind = amcs_wind_split(wind, VSPLIT);
-		amcs_wind_split(wind, VSPLIT);
 	}
 
 	if (screens == NULL)
 		error(1, "screens not found");
 
 	amcs_udev_free_cardnames(cards);
+
+#if 1 // TEST
+	amcs_wind *wind1;
+	amcs_wind *wind2;
+	amcs_wind *wind3;
+	uint32_t *buf1;
+	uint32_t *buf2;
+	uint32_t *buf3;
+	size_t size;
+
+	screen = screens;
+
+	while (screen != NULL) {
+		wind1 = amcs_wind_get_root(screen);
+		wind2 = amcs_wind_split(wind1, VSPLIT);
+		wind3 = amcs_wind_split(wind2, HSPLIT);
+
+		size = amcs_wind_get_width(wind1) * amcs_wind_get_height(wind1);
+		buf1 = xmalloc(size * sizeof (uint32_t));
+		amcs_wind_setbuf(wind1, buf1);
+
+		size = amcs_wind_get_width(wind2) * amcs_wind_get_height(wind2);
+		buf2 = xmalloc(size * sizeof (uint32_t));
+		amcs_wind_setbuf(wind2, buf2);
+
+		size = amcs_wind_get_width(wind3) * amcs_wind_get_height(wind3);
+		buf3 = xmalloc(size * sizeof (uint32_t));
+		amcs_wind_setbuf(wind3, buf3);
+
+		size = amcs_wind_get_width(wind1) * amcs_wind_get_height(wind1);
+		for (i = 0; i < size; ++i)
+			buf1[i] = 0xFF0000;
+
+		size = amcs_wind_get_width(wind2) * amcs_wind_get_height(wind2);
+		for (i = 0; i < size; ++i)
+			buf2[i] = 0x00FF00;
+
+		size = amcs_wind_get_width(wind3) * amcs_wind_get_height(wind3);
+		for (i = 0; i < size; ++i)
+			buf3[i] = 0x0000FF;
+
+		amcs_wind_commit_buf(screen);
+
+		screen = amcs_wind_get_next(screen);
+	}
+#endif
 
 /*
 	if ((errno = pthread_create(&draw_thread, NULL, draw, NULL)) != 0)
