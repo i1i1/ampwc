@@ -241,9 +241,9 @@ amcs_wind_split(amcs_wind *wind, int stype)
 	new_wind->w = wind->parent->w - ((stype == VSPLIT) ? wind->w : 0);
 	new_wind->h = wind->parent->h - ((stype == HSPLIT) ? wind->h : 0);
 	new_wind->x = wind->parent->x + ((stype == VSPLIT) ?
-					  wind->parent->x/2 : 0);
+					  wind->parent->w/2 : 0);
 	new_wind->y = wind->parent->y + ((stype == HSPLIT) ?
-					  wind->parent->y/2 : 0);
+					  wind->parent->h/2 : 0);
 	new_wind->buf = NULL;
 	new_wind->screen = wind->screen;
 	new_wind->parent = wind->parent;
