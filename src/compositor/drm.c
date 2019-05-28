@@ -102,6 +102,7 @@ amcs_drm_init(const char *path)
 
 	amcs_drm_card *card;
 	amcs_drm_dev *dev_list;
+	amcs_drm_dev *drmdev;
 
 	drmModeRes *res;
 	drmModeConnector *conn;
@@ -139,6 +140,7 @@ amcs_drm_init(const char *path)
 
 	debug("Count connectors: %d", res->count_connectors);
 
+	dev_list = NULL;
 	for (i = 0; i < res->count_connectors; ++i) {
 		conn = drmModeGetConnector(fd, res->connectors[i]);
 
@@ -152,15 +154,9 @@ amcs_drm_init(const char *path)
 		if (enc == NULL)
 			goto free_connector;
 
-		if (i == 0) {
-			card->list = dev_list = xmalloc(sizeof (amcs_drm_dev));
-			dev_list->next = NULL;
-		}
-		else {
-			dev_list->next = xmalloc(sizeof (amcs_drm_dev));
-			dev_list = dev_list->next;
-			dev_list->next = NULL;
-		}
+		drmdev = xmalloc(sizeof (amcs_drm_dev));
+		drmdev->next = dev_list;
+		dev_list = card->list = drmdev;
 
 		dev_list->conn_id = conn->connector_id;
 		dev_list->enc_id = conn->encoder_id;
