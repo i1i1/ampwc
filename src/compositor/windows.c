@@ -112,6 +112,14 @@ amcs_wind_merge_screen_lists(amcs_screen_list *dst, amcs_screen_list *src)
 	return dst;
 }
 
+amcs_screen_list*
+amcs_wind_get_next(amcs_screen_list *screens)
+{
+	assert(screens);
+
+	return screens->next;
+}
+
 amcs_wind*
 amcs_wind_get_root(amcs_screen *screen)
 {
@@ -151,14 +159,12 @@ amcs_wind_getbuf(amcs_wind *wind)
 {
 	assert(wind);
 
-	if (wind->buf == NULL)
-		wind->buf = xmalloc(4 * wind->h * wind->w);
-
 	return wind->buf;
 }
 
 void
-commit_buf(amcs_screen *screen, amcs_wind *wind) {
+commit_buf(amcs_screen *screen, amcs_wind *wind)
+{
 	int i, j;
 	size_t offset;
 

@@ -19,6 +19,7 @@ typedef struct amcs_screen amcs_screen_list;
 amcs_screen_list *amcs_wind_get_screens(const char *path);
 amcs_screen_list *amcs_wind_merge_screen_lists(amcs_screen_list *dst,
 					       amcs_screen_list *src);
+amcs_screen_list *amcs_wind_get_next(amcs_screen_list *screens);
 
 amcs_wind *amcs_wind_get_root(amcs_screen *screen);
 amcs_wind *amcs_wind_get_parent(amcs_wind *wind);
