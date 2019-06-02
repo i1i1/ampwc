@@ -8,9 +8,7 @@ simple tiling manager, which will never be born.
 Running
 -------
 
-    $ make
-    $ WAYLAND_DEBUG=1 ./src/wlserv
-    $ WAYLAND_DISPLAY=wayland-0 WAYLAND_DEBUG=1 ./src/wlclient
+    $ make test
 
 
 Dependencies

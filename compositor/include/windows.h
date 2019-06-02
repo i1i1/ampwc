@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "drm.h"
+#include "amcs_drm.h"
 
 
 enum stypes {
