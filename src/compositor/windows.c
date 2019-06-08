@@ -5,9 +5,9 @@
 #include "udev.h"
 #include "windows.h"
 #include "macro.h"
+#include "drm.h"
 
 #define NOSPLIT 0
-
 
 struct amcs_wind {
 	enum stypes stype;
@@ -62,21 +62,21 @@ amcs_wind_get_screens(const char *path)
 		return NULL;
 	}
 
-	dev_list = amcs_drm_get_devlist(*card);
+	dev_list = (*card)->list;
 	screens = screen = xmalloc(sizeof (amcs_screen));
 
 	while (1) {
-		screen->w = amcs_drm_get_width(dev_list);
-		screen->h = amcs_drm_get_height(dev_list);
-		screen->pitch = amcs_drm_get_pitch(dev_list);
-		screen->buf = amcs_drm_get_buf(dev_list);
+		screen->w = dev_list->w;
+		screen->h = dev_list->h;
+		screen->pitch = dev_list->pitch;
+		screen->buf = dev_list->buf;
 		screen->card = card;
 		screen->next = NULL;
 
 		screen->root = xmalloc(sizeof (amcs_wind));
 		screen->root->stype = NOSPLIT;
-		screen->root->w = amcs_drm_get_width(dev_list);
-		screen->root->h = amcs_drm_get_height(dev_list);
+		screen->root->w = dev_list->w;
+		screen->root->h = dev_list->h;
 		screen->root->x = 0;
 		screen->root->y = 0;
 		screen->root->buf = NULL;
@@ -85,7 +85,7 @@ amcs_wind_get_screens(const char *path)
 		screen->root->subwind[1] = NULL;
 		screen->root->screen = screen;
 
-		if ((dev_list = amcs_drm_get_nextentry(dev_list)) == NULL)
+		if ((dev_list = dev_list->next) == NULL)
 			break;
 
 		screen->next = xmalloc(sizeof (amcs_screen));
@@ -162,7 +162,7 @@ amcs_wind_getbuf(amcs_wind *wind)
 	return wind->buf;
 }
 
-void
+static void
 commit_buf(amcs_screen *screen, amcs_wind *wind)
 {
 	int i, j;

@@ -12,7 +12,6 @@
 #include "udev.h"
 #include "macro.h"
 
-
 struct amcs_monitor {
 	char *name;
 	int status;

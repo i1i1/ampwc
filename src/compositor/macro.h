@@ -21,20 +21,16 @@
 do { 								\
 	fprintf(file, prefix LOG_FMT(log_fmt),			\
 			##arg);					\
-} while (0);
+	fflush(file);						\
+} while (0)
 
 #define error(status, fmt, arg...) 				\
 do { 								\
 	_int_logit(stderr, "error: ", fmt, ##arg);		\
-	fflush(stderr); 					\
 	exit(status);						\
 } while (0)
 
-#define warning(fmt, arg...) 					\
-do { 								\
-	_int_logit(stderr, "[-] ", fmt, ##arg);			\
-	fflush(stderr); 					\
-} while (0)
+#define warning(fmt, arg...) _int_logit(stderr, "[-] ", fmt, ##arg)
 
 #define log_default 1
 #define log_verbose 2
@@ -45,10 +41,7 @@ do { 								\
 #    define LOG_LEVEL log_verbose
 #  endif
 
-#  define debug(fmt, arg...) 					\
-   do {								\
-	_int_logit(stdout, "[+] ", fmt, ##arg);			\
-   } while (0)
+#  define debug(fmt, arg...) _int_logit(stdout, "[+] ", fmt, ##arg)
 
 #  define debugv(loglvl, fmt, arg...)				\
    do {								\

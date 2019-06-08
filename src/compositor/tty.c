@@ -65,7 +65,6 @@ tty_acquisition(int sig)
 
 	if (dev->state == 0) {
 		dev->state = 1;
-		ioctl(dev->fd, VT_RELDISP, VT_ACKACQ);
 		extern_acquisition();
 	}
 
@@ -81,7 +80,8 @@ tty_release(int sig)
 	if (dev->state == 1) {
 		dev->state = 0;
 		extern_release();
-		ioctl(dev->fd, VT_RELDISP, 1);
+		if ((errno = ioctl(dev->fd, VT_RELDISP, VT_ACKACQ)) != 0)
+			perror("ioctl(dev->fd, VT_RELDISP, VT_ACKACQ))");
 	}
 
 	pthread_mutex_unlock(&signal_mux);
@@ -139,6 +139,11 @@ amcs_tty_open(unsigned int num)
 		perror("open(path, O_RDWR | O_CLOEXEC)");
 		exit(1);
 	}
+
+	if (ioctl(dev->fd, KDSETMODE, KD_GRAPHICS)) {
+		perror("ioctl(dev->fd, KDSETMODE, KD_GRAPHICS)");
+		exit(1);
+	}
 }
 
 void
@@ -171,6 +176,7 @@ amcs_tty_sethand(void (*ext_acq) (void), void (*ext_rel) (void))
 	mode.mode = VT_PROCESS;
 	mode.acqsig = SIGUSR1;
 	mode.relsig = SIGUSR2;
+	mode.frsig = 0;
 
 	if (ioctl(dev->fd, VT_SETMODE, &mode)) {
 		perror("ioctl(fd, VT_SETMODE, &mode)");

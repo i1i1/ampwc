@@ -16,25 +16,6 @@
 #define DEPTH 24
 #define BPP 32
 
-
-struct amcs_drm_dev {
-	uint8_t *buf;
-	uint32_t conn_id, enc_id, crtc_id, fb_id;
-	uint32_t w, h;
-	uint32_t pitch, size, handle;
-	drmModeModeInfo mode;
-
-	amcs_drm_dev_list *next;
-};
-
-struct amcs_drm_card {
-	const char *path;
-	int fd;
-
-	amcs_drm_dev_list *list;
-};
-
-
 static int
 dumb_is_supported(int fd)
 {
@@ -185,48 +166,6 @@ free_connector:
 	drmModeFreeResources(res);
 
 	return card;
-}
-
-amcs_drm_dev_list*
-amcs_drm_get_devlist(amcs_drm_card *card)
-{
-	assert(card);
-	return card->list;
-}
-
-uint8_t*
-amcs_drm_get_buf(amcs_drm_dev *dev)
-{
-	assert(dev);
-	return dev->buf;
-}
-
-int32_t
-amcs_drm_get_pitch(amcs_drm_dev *dev)
-{
-	assert(dev);
-	return dev->pitch;
-}
-
-int32_t
-amcs_drm_get_width(amcs_drm_dev *dev)
-{
-	assert(dev);
-	return dev->w;
-}
-
-int32_t
-amcs_drm_get_height(amcs_drm_dev *dev)
-{
-	assert(dev);
-	return dev->h;
-}
-
-amcs_drm_dev_list*
-amcs_drm_get_nextentry(amcs_drm_dev_list *dev)
-{
-	assert(dev);
-	return dev->next;
 }
 
 void

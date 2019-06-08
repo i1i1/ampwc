@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 
-#include "drm.h"
-
+#define DRIPATH "/dev/dri/"
 
 enum stypes {
 	HSPLIT = 1,
