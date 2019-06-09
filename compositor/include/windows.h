@@ -2,6 +2,7 @@
 #define _AWC_WINDOWS_H
 
 #include <stdint.h>
+#include "amcs_drm.h"
 
 #define DRIPATH "/dev/dri/"
 

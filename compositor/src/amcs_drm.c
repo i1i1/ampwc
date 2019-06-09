@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 
 #include "macro.h"
-#include "drm.h"
+#include "amcs_drm.h"
 
 
 #define DEPTH 24
