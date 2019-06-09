@@ -84,13 +84,13 @@ global_add(void *our_data, struct wl_registry *registry, uint32_t name,
 	const char *interface, uint32_t version)
 {
 	debug("global_add iface = %s nm %d, version %d", interface, name, version);
-	if (strcmp(interface, "wl_compositor") == 0) {
+	if (STREQ(interface, "wl_compositor")) {
 		g_ctx.comp = wl_registry_bind(registry, name, &wl_compositor_interface, 3);
-	} else if (strcmp(interface, "wl_shm") == 0) {
+	} else if (STREQ(interface, "wl_shm")) {
 		g_ctx.shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
-	} else if (strcmp(interface, "wl_seat") == 0) {
+	} else if (STREQ(interface, "wl_seat")) {
 		g_ctx.seat = wl_registry_bind(registry, name, &wl_seat_interface, 1);
-	} else if(strcmp(interface, "xdg_wm_base") == 0) {
+	} else if(STREQ(interface, "xdg_wm_base")) {
 		debug("@WRITEME xdg_shell initialize");
 		g_ctx.shell = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
 	}
@@ -156,17 +156,13 @@ main(int argc, const char *argv[])
 	struct wl_display *display = wl_display_connect(NULL);
 	int rc, niter;
 
-	if (display == NULL) {
-		warning("can't connect to display");
-		return 1;
-	}
+	if (display == NULL)
+		error(1, "can't connect to display");
 
 	struct wl_registry *registry = wl_display_get_registry(display);
 
-	if (registry == NULL) {
-		warning("can't get registry");
-		return 2;
-	}
+	if (registry == NULL)
+		error(2, "can't get registry");
 
 	void *our_data = NULL;	/* arbitrary state you want to keep around */;
 	rc = wl_registry_add_listener(registry, &registry_listener, our_data);

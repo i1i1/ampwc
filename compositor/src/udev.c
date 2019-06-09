@@ -4,10 +4,10 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <assert.h>
+#include <stdint.h>
 
 #include <sys/select.h>
 #include <sys/time.h>
-#include <sys/types.h>
 
 #include "udev.h"
 #include "macro.h"
@@ -66,7 +66,7 @@ amcs_udev_get_monitors(void)
 			strcpy(monitor->name, sysname);
 			monitor->status = 0;
 
-			if (strcmp(status, "connected") == 0)
+			if (STREQ(status, "connected"))
 				monitor->status = 1;
 		}
 
@@ -156,7 +156,7 @@ send_changes(void)
 		monitor = monitor_list;
 
 		for (; monitor != NULL; monitor = monitor->next) {
-			if (strcmp(monitor->name, new_monitor->name) == 0 &&
+			if (STREQ(monitor->name, new_monitor->name) &&
 			    monitor->status != new_monitor->status) {
 				monitor->status = new_monitor->status;
 				ext_update_status(monitor->name, monitor->status);

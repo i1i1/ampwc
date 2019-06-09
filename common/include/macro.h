@@ -5,6 +5,9 @@
 #include <errno.h>
 #include <stdio.h>
 
+#define STREQ(a, b)  (strcmp(a, b) == 0)
+#define STRNEQ(a, b) (strcmp(a, b) != 0)
+
 #define ARRSZ(arr) (sizeof(arr) / sizeof(arr[0]))
 
 #define CRLF	"\r\n"

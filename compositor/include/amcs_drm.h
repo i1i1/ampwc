@@ -4,7 +4,7 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#include <sys/types.h>
+#include <stdint.h>
 
 typedef struct amcs_drm_card amcs_drm_card;
 typedef struct amcs_drm_dev amcs_drm_dev_list;
