@@ -26,7 +26,11 @@ fullclean: clean
 .PHONY: clean userclean fullclean all
 .SECONDARY: $(DEP)
 
-ifneq "$(MAKECMDGOALS)" "clean"
--include $(DEP)
+ifeq "$(MAKECMDGOALS)" "clean"
+else
+ ifeq "$(MAKECMDGOALS)" "fullclean"
+ else
+  -include $(DEP)
+ endif
 endif
 
