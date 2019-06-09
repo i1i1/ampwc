@@ -1,6 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -ggdb -Iinclude -I../common/include
 LDFLAGS = -lm `pkg-config --libs wayland-client`
+TERM = xterm
 
 HDR = include/xdg-shell-client.h
 OBJ = $(wildcard ../common/build/*.o)
@@ -15,7 +16,7 @@ $(PRE): $(XDG_PROTO)
 	wayland-scanner client-header $< $@
 
 test: all
-	xterm -e $(OUT)
+	$(TERM) -e "$(OUT); cat >/dev/null"
 
 userclean:
 	rm -f $(PRE)
