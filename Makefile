@@ -4,8 +4,9 @@ all:
 	make -C client
 
 test:
-	make -C compositor test
-	make -C client     test
+	make -C compositor test &
+	sleep 0.5
+	make -C client     test &
 
 clean:
 	make -C common     clean
