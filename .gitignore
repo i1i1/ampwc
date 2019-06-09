@@ -1,0 +1,8 @@
+*.swp
+*.o
+client/include/xdg-shell-client.h
+common/src/xdg-shell.c
+compositor/include/xdg-shell-server.h
+wlclient
+wlserv
+tags
