@@ -11,8 +11,10 @@ $(OUT): $(_OBJ) $(OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 endif
 
+$(DEP): $(PRE)
+
 build/%.d: src/%.c
-	$(CC) $(CFLAGS) -MM $< | sed -e "s/^[^ \t]\+\.o:/build\/&/" > $@
+	$(CC) $(CFLAGS) -MM $< | sed -e "s!^[^ \t]\+\.o:!build/&!" > $@
 
 build/%.o: src/%.c build/%.d
 	$(CC) $(CFLAGS) -c $< -o $@
