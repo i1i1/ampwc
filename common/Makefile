@@ -8,8 +8,10 @@ PRE = src/xdg-shell.c
 include ../common/gener.mk
 
 $(PRE): $(XDG_PROTO)
-	wayland-scanner code $< $@
+	$(call prettify, GEN, $@, \
+	    wayland-scanner code $< $@)
 
 userclean:
-	rm -f $(PRE)
+	$(call prettify, RM, $(PRE), \
+	    rm -f $(PRE))
 
