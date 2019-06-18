@@ -102,6 +102,7 @@ amcs_udev_get_cardnames(void)
 		error(1, "Can not create unumerate object");
 
 	udev_enumerate_add_match_property(udev_enum, "DEVTYPE", "drm_minor");
+	udev_enumerate_add_match_sysname(udev_enum, "card[0-9]*");
 	udev_enumerate_scan_devices(udev_enum);
 
 	if ((udev_list = udev_enumerate_get_list_entry(udev_enum)) == NULL)

@@ -2,34 +2,21 @@
 #include <stdint.h>
 #include <assert.h>
 
+#include "drm.h"
+#include "macro.h"
 #include "udev.h"
 #include "windows.h"
-#include "macro.h"
-#include "drm.h"
 
-#define NOSPLIT 0
+static struct amcs_wintree *
+win_get_root(struct amcs_win *w)
+{
+	struct amcs_wintree *wt = AMCS_WINTREE(w);
 
-struct amcs_wind {
-	enum stypes stype;
-	int w, h;
-	int x, y;
-	uint32_t *buf;
-	amcs_screen *screen;
-
-	amcs_wind *parent;
-	amcs_wind *subwind[2];
-};
-
-struct amcs_screen {
-	int w, h;
-	int pitch;
-	amcs_wind *root;
-	uint8_t *buf;
-	amcs_drm_card **card;
-
-	amcs_screen_list *next;
-};
-
+	assert(w);
+	while (wt->parent)
+		wt = wt->parent;
+	return wt;
+}
 
 static void
 update_screen_state(const char *name, int status)
@@ -40,128 +27,331 @@ update_screen_state(const char *name, int status)
 		debug("EVENT: %s: disconnected", name);
 }
 
-amcs_screen_list*
-amcs_wind_get_screens(const char *path)
+// Public functions
+
+int
+amcs_screens_add(pvector *amcs_screens, const char *path)
 {
-	amcs_drm_card **card;
+	amcs_drm_card *card;
 	amcs_drm_dev_list *dev_list;
-	amcs_screen *screen;
-	amcs_screen_list *screens;
-	amcs_monitor_list *monitors;
+	struct amcs_screen *screen;
 
+	assert(amcs_screens && path);
 
-	assert(path);
-
-	monitors = amcs_udev_get_monitors();
 	amcs_udev_monitor_tracking(update_screen_state);
 
-	card = xmalloc(sizeof (amcs_drm_card*));
-	if ((*card = amcs_drm_init(path)) == NULL) {
-		free(card);
-
-		return NULL;
+	if ((card = amcs_drm_init(path)) == NULL) {
+		return 1;
 	}
 
-	dev_list = (*card)->list;
-	screens = screen = xmalloc(sizeof (amcs_screen));
+	dev_list = card->list;
 
-	while (1) {
+	while (dev_list) {
+		screen = xmalloc(sizeof (*screen));
 		screen->w = dev_list->w;
 		screen->h = dev_list->h;
 		screen->pitch = dev_list->pitch;
 		screen->buf = dev_list->buf;
 		screen->card = card;
-		screen->next = NULL;
+		pvector_push(amcs_screens, screen);
 
-		screen->root = xmalloc(sizeof (amcs_wind));
-		screen->root->stype = NOSPLIT;
-		screen->root->w = dev_list->w;
-		screen->root->h = dev_list->h;
-		screen->root->x = 0;
-		screen->root->y = 0;
-		screen->root->buf = NULL;
-		screen->root->parent = NULL;
-		screen->root->subwind[0] = NULL;
-		screen->root->subwind[1] = NULL;
-		screen->root->screen = screen;
+		card = NULL; // set card only for first screen
 
-		if ((dev_list = dev_list->next) == NULL)
-			break;
-
-		screen->next = xmalloc(sizeof (amcs_screen));
-		screen = screen->next;
-		screen->next = NULL;
+		dev_list = dev_list->next;
 	}
-
-	return screens;
-}
-
-amcs_screen_list*
-amcs_wind_merge_screen_lists(amcs_screen_list *dst, amcs_screen_list *src)
-{
-	if (src == NULL)
-		return dst;
-	else if (dst == NULL)
-		return src;
-
-	for (; dst->next != NULL; dst = dst->next)
-		;
-
-	dst->next = src;
-
-	return dst;
-}
-
-amcs_screen_list*
-amcs_wind_get_next(amcs_screen_list *screens)
-{
-	assert(screens);
-
-	return screens->next;
-}
-
-amcs_wind*
-amcs_wind_get_root(amcs_screen *screen)
-{
-	assert(screen);
-
-	return screen->root;
-}
-
-amcs_wind*
-amcs_wind_get_parent(amcs_wind *wind)
-{
-	assert(wind);
-
-	return wind->parent;
-}
-
-amcs_wind*
-amcs_wind_get_brother(amcs_wind *wind)
-{
-	assert(wind);
-
-	if (wind->parent->subwind[0] == wind)
-		return wind->parent->subwind[1];
-
-	return wind->parent->subwind[0];
+	return 0;
 }
 
 void
-amcs_wind_setbuf(amcs_wind *wind, uint32_t *buf)
+amcs_screens_free(pvector *amcs_screens)
 {
-	assert(wind);
-	wind->buf = buf;
+	int i;
+	struct amcs_screen **sarr;
+
+	assert(amcs_screens);
+	sarr = pvector_data(amcs_screens);
+	for (i = 0; i < pvector_len(amcs_screens); i++) {
+		if (sarr[i]->card != NULL) {
+			amcs_drm_free(sarr[i]->card);
+		}
+		free(sarr[i]);
+	}
+	for (i = 0; i < pvector_len(amcs_screens); i++)
+		pvector_pop(amcs_screens);
 }
 
-uint32_t*
-amcs_wind_getbuf(amcs_wind *wind)
+struct amcs_wintree *
+amcs_wintree_new(struct amcs_wintree *par, enum wintree_type t)
 {
-	assert(wind);
+	struct amcs_wintree *res;
 
-	return wind->buf;
+	res = xmalloc(sizeof(*res));
+	memset(res, 0, sizeof(*res));
+	res->type = WT_TREE;
+	res->wt = t;
+	res->parent = par;
+	pvector_init(&res->subwins, xrealloc);
+
+	amcs_wintree_resize_subwins(par);
+	return res;
 }
 
+void
+amcs_wintree_free(struct amcs_wintree *wt)
+{
+	assert(wt && wt->type == WT_TREE);
+	amcs_wintree_remove_all(wt);
+	free(wt);
+}
+
+void
+amcs_wintree_set_screen(struct amcs_wintree *wt, struct amcs_screen *screen)
+{
+	assert(wt && wt->type == WT_TREE);
+
+	wt->screen = screen;
+	wt->x = wt->y = 0;
+	wt->w = screen->w;
+	wt->h = screen->h;
+	amcs_wintree_resize_subwins(wt);
+}
+
+int
+amcs_wintree_pass(struct amcs_wintree *wt, wintree_pass_cb cb, void *data)
+{
+	struct amcs_win **arr;
+	int i, rc;
+
+	if (wt == NULL)
+		return 0;
+	debug("pass");
+
+	rc = cb(AMCS_WIN(wt), data);
+
+	if (wt->type == WT_WIN)
+		return rc;
+	arr = pvector_data(&wt->subwins);
+	for (i = 0; i < pvector_len(&wt->subwins); i++) {
+		if (arr[i]->type == WT_WIN)
+			rc = cb(arr[i], data);
+		else if (arr[i]->type == WT_TREE)
+			rc = amcs_wintree_pass(AMCS_WINTREE(arr[i]), cb, data);
+		else
+			error(2, "should not reach");
+
+		if (rc != 0)
+			return rc;
+	}
+	return 0;
+}
+
+int
+amcs_wintree_insert(struct amcs_wintree *wt, struct amcs_win *w, int pos)
+{
+	assert(wt && wt->type == WT_TREE && w->type == WT_WIN);
+
+	warning("rewrite that, refactor vector.[ch]");
+	debug("insert %p, into %p nsubwinds %d", w, wt, pvector_len(&wt->subwins));
+	pvector_push(&wt->subwins, w);
+	w->parent = wt;
+	amcs_wintree_resize_subwins(wt);
+	return 0;
+}
+
+int
+amcs_wintree_pos(struct amcs_wintree *wt, struct amcs_win *w)
+{
+	struct amcs_win **arr;
+	int i;
+
+	assert(wt && wt->type == WT_TREE);
+
+	arr = pvector_data(&wt->subwins);
+	for (i = 0; i < pvector_len(&wt->subwins); i++) {
+		if (arr[i] == w)
+			return i;
+	}
+	return -1;
+}
+
+int
+amcs_wintree_remove(struct amcs_wintree *wt, struct amcs_win *w)
+{
+	int pos;
+	assert(wt && wt->type == WT_TREE);
+
+	pos = amcs_wintree_pos(wt, w);
+	if (pos >= 0) {
+		struct amcs_win *w;
+		w = pvector_get(&wt->subwins, pos);
+		w->parent = NULL;
+
+		pvector_del(&wt->subwins, pos);
+		amcs_wintree_resize_subwins(wt);
+		return 0;
+	}
+	error(2, "should not happen, programmer error");
+	return 1;
+}
+
+int
+amcs_wintree_remove_idx(struct amcs_wintree *wt, int pos)
+{
+	assert(wt && wt->type == WT_TREE);
+
+	pvector_del(&wt->subwins, pos);
+	amcs_wintree_resize_subwins(wt);
+	return 0;
+}
+
+void
+amcs_wintree_remove_all(struct amcs_wintree *wt)
+{
+	int i;
+	assert(wt && wt->type == WT_TREE);
+
+	for (i = 0; i < pvector_len(&wt->subwins); i++) {
+		pvector_pop(&wt->subwins);
+	}
+	amcs_wintree_resize_subwins(wt);
+}
+
+struct amcs_win *
+amcs_win_new(struct amcs_wintree *par)
+{
+	struct amcs_win *res;
+
+	debug("win_new, %p", par);
+	res = xmalloc(sizeof(*res));
+	memset(res, 0, sizeof(*res));
+	res->type = WT_WIN;
+	if (par)
+		amcs_wintree_insert(par, res, -1);
+
+	return res;
+}
+
+void
+amcs_win_free(struct amcs_win *w)
+{
+	assert(w && w->type == WT_WIN);
+	amcs_win_orphain(w);
+	free(w);
+}
+
+static int
+_commit_cb(struct amcs_win *w, void *opaq)
+{
+	debug("commit cb");
+	if (w && w->type == WT_WIN && w->buf) {
+		amcs_win_commit(w);
+	}
+	return 0;
+}
+
+int
+amcs_wintree_resize_subwins(struct amcs_wintree *wt)
+{
+	int i, nwin, step;
+
+	if (wt == NULL || wt->type == WT_WIN)
+		return 0;
+
+	nwin = pvector_len(&wt->subwins);
+	if (nwin == 0)
+		return 0;
+
+	if (wt->wt == WINTREE_HSPLIT) {
+		step = wt->h / nwin;
+	} else {
+		step = wt->w / nwin;
+	}
+
+	assert(step); // is that really happens?
+
+	for (i = 0; i < nwin; i++) {
+		struct amcs_win *tmp;
+		tmp = pvector_get(&wt->subwins, i);
+
+		if (wt->wt == WINTREE_HSPLIT) {
+			tmp->x = wt->x;
+			tmp->y = wt->y + i * step;
+			tmp->w = wt->w;
+			tmp->h = step;
+		} else {
+			tmp->x = wt->x + i * step;
+			tmp->y = wt->y;
+			tmp->w = step;
+			tmp->h = wt->h;
+		}
+		if (tmp->type == WT_TREE) {
+			amcs_wintree_resize_subwins(AMCS_WINTREE(tmp));
+		}
+	}
+	amcs_wintree_pass(wt, _commit_cb, NULL);
+	return 0;
+}
+
+int
+amcs_win_commit(struct amcs_win *w)
+{
+	struct amcs_wintree *root;
+	struct amcs_screen *screen;
+	int i, j;
+	size_t offset;
+
+	root = win_get_root(w);
+	debug("get root %p", root);
+	if (root->screen == NULL)
+		return -1;
+
+	screen = root->screen;
+	debug("commit stuff");
+	for (i = 0; i < w->h; ++i) {
+		for (j = 0; j < w->w; ++j) {
+			offset = screen->pitch * (i + w->y) + 4*(j + w->x);
+			*(uint32_t*)&screen->buf[offset] = w->buf[w->w * i + j];
+		}
+	}
+
+	return 0;
+}
+
+int
+amcs_win_orphain(struct amcs_win *w)
+{
+	struct amcs_wintree *par;
+
+	assert(w);
+	if (w->parent == NULL)
+		return 1;
+	par = w->parent;
+	w->parent = NULL;
+
+	amcs_wintree_remove(par, w);
+	return 0;
+}
+
+static int
+_print_cb(struct amcs_win *w, void *opaq)
+{
+	debug("tp = %s, x = %d y = %d"
+	      "         w = %d h = %d", w->type == WT_WIN ? "wt_win" : "wt_wtree",
+			w->x, w->y, w->w, w->h);
+	return 0;
+}
+
+void
+amcs_wintree_debug(struct amcs_wintree *wt)
+{
+	if (wt == NULL)
+		return;
+	amcs_wintree_pass(wt, _print_cb, NULL);
+}
+////////
+
+/*
+void
 static void
 commit_buf(amcs_screen *screen, amcs_wind *wind)
 {
@@ -183,114 +373,5 @@ commit_buf(amcs_screen *screen, amcs_wind *wind)
 		}
 	}
 }
+*/
 
-void
-amcs_wind_commit_buf(amcs_screen *screen)
-{
-	assert(screen);
-	commit_buf(screen, screen->root);
-}
-
-int
-amcs_wind_get_width(amcs_wind *wind)
-{
-	assert(wind);
-	return wind->w;
-}
-
-int
-amcs_wind_get_height(amcs_wind *wind)
-{
-	assert(wind);
-	return wind->h;
-}
-
-amcs_wind*
-amcs_wind_split(amcs_wind *wind, int stype)
-{
-	amcs_wind *new_wind;
-
-
-	assert(stype == VSPLIT || stype == HSPLIT);
-	assert(wind);
-
-	new_wind = xmalloc(sizeof (amcs_wind));
-
-	if (wind->parent == NULL)
-		wind->screen->root = new_wind;
-	else {
-		if (wind->parent->subwind[0] == wind)
-			wind->parent->subwind[0] = new_wind;
-		else
-			wind->parent->subwind[1] = new_wind;
-	}
-
-	new_wind->stype = stype;
-	new_wind->w = wind->w;
-	new_wind->h = wind->h;
-	new_wind->x = wind->x;
-	new_wind->y = wind->y;
-	new_wind->buf = NULL;
-	new_wind->screen = wind->screen;
-	new_wind->parent = wind->parent;
-	new_wind->subwind[0] = wind;
-	new_wind->subwind[1] = xmalloc(sizeof (amcs_wind));
-
-	wind->h = (stype == HSPLIT) ? wind->h/2 : wind->h;
-	wind->w = (stype == VSPLIT) ? wind->w/2 : wind->w;
-	wind->parent = new_wind;
-	// TODO: call changing window size handler
-
-	new_wind = new_wind->subwind[1];
-
-	new_wind->stype = NOSPLIT;
-	new_wind->w = wind->parent->w - ((stype == VSPLIT) ? wind->w : 0);
-	new_wind->h = wind->parent->h - ((stype == HSPLIT) ? wind->h : 0);
-	new_wind->x = wind->parent->x + ((stype == VSPLIT) ?
-					  wind->parent->w/2 : 0);
-	new_wind->y = wind->parent->y + ((stype == HSPLIT) ?
-					  wind->parent->h/2 : 0);
-	new_wind->buf = NULL;
-	new_wind->screen = wind->screen;
-	new_wind->parent = wind->parent;
-	new_wind->subwind[0] = NULL;
-	new_wind->subwind[1] = NULL;
-
-	return new_wind;
-}
-
-static void
-free_windows(amcs_wind *wind)
-{
-	if (wind == NULL)
-		return;
-
-	if (wind->buf != NULL)
-		free(wind->buf);
-
-	free_windows(wind->subwind[0]);
-	free_windows(wind->subwind[1]);
-	free(wind);
-}
-
-void
-amcs_wind_free_screens(amcs_screen_list *screens)
-{
-	amcs_screen *screen;
-
-
-	assert(screens);
-
-	while (screens != NULL) {
-		free_windows(screens->root);
-
-		if (*screens->card != NULL) {
-			amcs_drm_free(*screens->card);
-			*screens->card = NULL;
-		}
-
-		screen = screens;
-		screens = screens->next;
-		free(screen);
-	}
-}

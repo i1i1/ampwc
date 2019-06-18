@@ -10,43 +10,139 @@
 #include "macro.h"
 #include "wl-server.h"
 
-void
-default_stuff()
+static void
+destroy(struct wl_client *client, struct wl_resource *resource)
 {
-	debug("CHECK");
+	wl_resource_destroy(resource);
+}
+
+static void
+xsurf_set_parent(struct wl_client *client, struct wl_resource *resource, struct wl_resource *parent_resource)
+{
+	debug("");
+}
+
+static void
+xsurf_set_title(struct wl_client *client, struct wl_resource *resource, const char *title)
+{
+	debug("");
+}
+
+static void
+xsurf_set_app_id(struct wl_client *client, struct wl_resource *resource, const char *app_id)
+{
+	debug("");
+}
+
+static void
+xsurf_show_window_menu(struct wl_client *client, struct wl_resource *resource, struct wl_resource *seat, uint32_t serial, int32_t x, int32_t y)
+{
+	debug("");
+}
+
+static void
+xsurf_move(struct wl_client *client, struct wl_resource *resource, struct wl_resource *seat, uint32_t serial)
+{
+	debug("");
+}
+
+static void
+xsurf_resize(struct wl_client *client, struct wl_resource *resource, struct wl_resource *seat, uint32_t serial, uint32_t edges)
+{
+	debug("");
+}
+
+static void
+xsurf_set_max_size(struct wl_client *client, struct wl_resource *resource, int32_t width, int32_t height)
+{
+	debug("");
+}
+
+static void
+xsurf_set_min_size(struct wl_client *client, struct wl_resource *resource, int32_t width, int32_t height)
+{
+	debug("");
+}
+
+static void
+xsurf_set_maximized(struct wl_client *client, struct wl_resource *resource)
+{
+	debug("");
+}
+
+static void
+xsurf_unset_maximized(struct wl_client *client, struct wl_resource *resource)
+{
+	debug("");
+}
+
+static void
+xsurf_set_fullscreen(struct wl_client *client, struct wl_resource *resource, struct wl_resource *output)
+{
+	debug("");
+}
+
+static void
+xsurf_unset_fullscreen(struct wl_client *client, struct wl_resource *resource)
+{
+	debug("");
+}
+
+static void
+xsurf_set_minimized(struct wl_client *client, struct wl_resource *resource)
+{
+	debug("");
 }
 
 static const struct xdg_toplevel_interface toplevel_interface = {
-	.destroy = NULL,
-	.set_parent = NULL,
-	.set_title = NULL,
-	.set_app_id = NULL,
-	.show_window_menu = NULL,
-	.move = NULL,
-	.resize = NULL,
-	.set_max_size = NULL,
-	.set_min_size = NULL,
-	.set_maximized = NULL,
-	.unset_maximized = NULL,
-	.set_fullscreen = NULL,
-	.set_minimized = NULL,
+	.destroy = destroy,
+	.set_parent = xsurf_set_parent,
+	.set_title = xsurf_set_title,
+	.set_app_id = xsurf_set_app_id,
+	.show_window_menu = xsurf_show_window_menu,
+	.move = xsurf_move,
+	.resize = xsurf_resize,
+	.set_max_size = xsurf_set_max_size,
+	.set_min_size = xsurf_set_min_size,
+	.set_maximized = xsurf_set_maximized,
+	.unset_maximized = xsurf_unset_maximized,
+	.set_fullscreen = xsurf_set_fullscreen,
+	.unset_fullscreen = xsurf_unset_fullscreen,
+	.set_minimized = xsurf_set_minimized,
 };
-
 
 void
 window_init(struct amcs_surface *mysurf)
 {
+	struct amcs_win *old;
 	uint32_t serial;
 	uint32_t *newst;
 
-	serial = wl_display_next_serial(compositor_ctx.display);
+	assert(mysurf);
 
+	serial = wl_display_next_serial(compositor_ctx.display);
 	mysurf->pending.xdg_serial = serial;
 	debug("generated serial = %d", serial);
 	newst = wl_array_add(&mysurf->surf_states, sizeof(*newst));
 	*newst = XDG_TOPLEVEL_STATE_ACTIVATED;
 
-	xdg_toplevel_send_configure(mysurf->xdgtopres, 700, 500, &mysurf->surf_states);
+	//TODO: choose screen
+	int nroot;
+	nroot = 0;
+	old = pvector_get(&compositor_ctx.cur_wins, nroot);
+	if (old == NULL) {
+		struct amcs_wintree *wt;
+		wt = pvector_get(&compositor_ctx.screen_roots, nroot);
+		mysurf->aw = amcs_win_new(wt);
+	} else {
+		mysurf->aw = amcs_win_new(old->parent);
+	}
+	pvector_set(&compositor_ctx.cur_wins, nroot, mysurf->aw);
+
+	mysurf->w = mysurf->aw->w;
+	mysurf->h = mysurf->aw->h;
+
+	xdg_toplevel_send_configure(mysurf->xdgtopres, mysurf->w, mysurf->h, &mysurf->surf_states);
 
 	xdg_surface_send_configure(mysurf->xdgres, serial);
 }
@@ -92,20 +188,14 @@ static const struct xdg_surface_interface surface_interface = {
 	.ack_configure = surf_ack_configure
 };
 
-void
-wmbase_destroy(struct wl_client *client, struct wl_resource *resource)
-{
-	wl_resource_destroy(resource);
-}
-
-void
+static void
 wmbase_create_positioner(struct wl_client *client, struct wl_resource *resource,
 	uint32_t id)
 {
 	debug("");
 }
 
-void
+static void
 wmbase_get_xdg_surface(struct wl_client *client, struct wl_resource *resource,
 	uint32_t id, struct wl_resource *surface)
 {
@@ -117,14 +207,14 @@ wmbase_get_xdg_surface(struct wl_client *client, struct wl_resource *resource,
 	wl_resource_set_implementation(mysurf->xdgres, &surface_interface, mysurf, NULL);
 }
 
-void
+static void
 wmbase_pong(struct wl_client *client, struct wl_resource *resource, uint32_t serial)
 {
 	debug("serial = %x", serial);
 }
 
 static const struct xdg_wm_base_interface xdg_base_interface = {
-	.destroy = wmbase_destroy,
+	.destroy = destroy,
 	.create_positioner = wmbase_create_positioner,
 	.get_xdg_surface = wmbase_get_xdg_surface,
 	.pong = wmbase_pong

@@ -8,14 +8,18 @@
 
 #include <wayland-client.h>
 
+//
+#include <time.h>
+
 #include "xdg-shell-client.h"
 #include "macro.h"
 #include "utils.h"
 
-#define WIN_WIDTH 800
-#define WIN_HEIGHT 600
+#define WIN_WIDTH 2900
+#define WIN_HEIGHT 2080
 
 struct client_ctx {
+	struct wl_display *disp;
 	struct wl_compositor *comp;
 	struct wl_shm *shm;
 	struct wl_shm_pool *pool;
@@ -130,7 +134,9 @@ paint_init(struct client_ctx *ctx)
 		exit(1);
 	}
 	ctx->datasz = mapsz;
-	memset(ctx->data, 0x42, mapsz);
+
+	srandom(time(NULL));
+	memset(ctx->data, random() & 0xff, mapsz);
 
 	ctx->pool = wl_shm_create_pool(ctx->shm, fd, mapsz);
 
@@ -140,12 +146,14 @@ paint_init(struct client_ctx *ctx)
 
 	//xdg_surface_set_window_geometry(ctx->xdgsurf, 0, 0, 600, 800);
 	wl_surface_attach(ctx->surf, ctx->buf, ctx->w, ctx->h);
+	wl_display_roundtrip(ctx->disp);
 	wl_surface_commit(ctx->surf);
 }
 
 void
 paint_surface(struct wl_surface *surf)
 {
+	srandom(time(NULL));
 	memset(g_ctx.data, random() & 0xff, g_ctx.datasz);
 	wl_surface_commit(surf);
 }
@@ -158,6 +166,8 @@ main(int argc, const char *argv[])
 
 	if (display == NULL)
 		error(1, "can't connect to display");
+
+	g_ctx.disp = display;
 
 	struct wl_registry *registry = wl_display_get_registry(display);
 

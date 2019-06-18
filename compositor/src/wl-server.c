@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <wayland-server.h>
 #include <wayland-server-core.h>
@@ -17,8 +18,7 @@
 #include "windows.h"
 #include "tty.h"
 
-struct amcs_compositor compositor_ctx;
-static amcs_screen *screens;
+struct amcs_compositor compositor_ctx = {0};
 
 struct amcs_surface *
 amcs_surface_new()
@@ -36,6 +36,21 @@ amcs_surface_new()
 void
 amcs_surface_free(struct amcs_surface *surf)
 {
+	struct amcs_compositor *ctx = &compositor_ctx;
+	if (surf->aw) {
+		struct amcs_win *w;
+
+		//TODO: choose screen, choose another window
+		int nroot;
+		nroot = 0;
+		w = pvector_get(&ctx->cur_wins, nroot);
+		if (surf->aw == w) {
+			pvector_set(&ctx->cur_wins, nroot, NULL);
+		}
+
+		amcs_win_orphain(surf->aw);
+
+	}
 	free(surf);
 }
 
@@ -44,12 +59,20 @@ sig_surfaces_redraw(struct wl_listener *listener, void *data)
 {
 	struct amcs_compositor *ctx = (struct amcs_compositor *) data;
 	struct amcs_surface *surf;
+	int i;
 
 	debug("");
 
+	/*
 	wl_list_for_each(surf, &ctx->surfaces, link) {
 		debug("next surface %p", surf);
 	}
+	*/
+	for (i = 0; i < pvector_len(&ctx->screen_roots); i++) {
+		debug("next screen");
+		amcs_wintree_debug(pvector_get(&ctx->screen_roots, i));
+	}
+
 }
 
 static void
@@ -137,7 +160,16 @@ surf_commit(struct wl_client *client, struct wl_resource *resource)
 
 	data = wl_shm_buffer_get_data(buf);
 	debug("data = %p", data);
-	debug("data item = %x", ((uint8_t*)data)[0]);
+	if (mysurf->aw) {
+		debug("try to commit buf, x %d y %d", x, y);
+		//dirty hack
+		mysurf->aw->buf = xmalloc(x * y * 4);
+		debug("1");
+		memcpy(mysurf->aw->buf, data, x * y * 4);
+		debug("2");
+		amcs_win_commit(mysurf->aw);
+	}
+	debug("data[0] = %x", ((uint8_t*)data)[0]);
 	wl_shm_buffer_end_access(buf);
 	debug("end!");
 
@@ -204,60 +236,70 @@ static void
 start_draw(void)
 {
 	int i;
-	int len;
-	char *path;
+	char path[PATH_MAX];
 	const char **cards;
-	amcs_screen *screen;
-	amcs_wind *wind;
+	struct amcs_compositor *ctx = &compositor_ctx;
+	int nroots, nscreens;
+	struct amcs_screen **sarr;
+	struct amcs_wintree **rootarr;
 
-
+	debug("start draw");
 	cards = amcs_udev_get_cardnames();
+	//TODO: flush screens
 
 	for (i = 0; cards[i] != NULL; ++i) {
-		len = strlen(DRIPATH) + strlen(cards[i]) + 1;
-		path = xmalloc(len);
-
-		len = strlen(DRIPATH) + strlen(cards[i]) + 1;
-		strcpy(path, DRIPATH);
-		strcpy(path + strlen(DRIPATH), cards[i]);
-
-		screen = amcs_wind_get_screens(path);
-		screens = amcs_wind_merge_screen_lists(screens, screen);
-		free(path);
-
-		if (screen == NULL)
-			continue;
-
-		wind = amcs_wind_get_root(screen);
-		wind = amcs_wind_split(wind, VSPLIT);
-		amcs_wind_split(wind, VSPLIT);
+		snprintf(path, sizeof(path), "%s%s", DRIPATH, cards[i]);
+		amcs_screens_add(&ctx->screens, path);
 	}
 
-	if (screens == NULL)
+	nscreens = pvector_len(&ctx->screens);
+	if (nscreens == 0)
 		error(1, "screens not found");
 
+	nroots = pvector_len(&ctx->screen_roots);
+	if (nroots < nscreens) {
+		int i;
+		struct amcs_wintree *wt;
+		sarr = pvector_data(&ctx->screens);
+		//initialize root trees for each unused screen
+		for (i = nroots; i < nscreens; i++) {
+			wt = amcs_wintree_new(NULL, WINTREE_VSPLIT);
+			amcs_wintree_set_screen(wt, sarr[i]);
+			pvector_push(&ctx->screen_roots, wt);
+		}
+	} else if (nroots > nscreens) {
+		error(2, "TODO: Writeme!");
+	}
+
+	nscreens = pvector_len(&ctx->screens);
+	nroots = pvector_len(&ctx->screen_roots);
+	assert(nscreens == nroots);
+
+	sarr = pvector_data(&ctx->screens);
+	rootarr = pvector_data(&ctx->screen_roots);
+	for (i = 0; i < nscreens; i++) {
+		amcs_wintree_set_screen(rootarr[i], sarr[i]);
+	}
+	pvector_reserve(&ctx->cur_wins, pvector_len(&ctx->screens));
+	pvector_clear(&ctx->cur_wins);
+
 	amcs_udev_free_cardnames(cards);
-
-/*
-	if ((errno = pthread_create(&draw_thread, NULL, draw, NULL)) != 0)
-		perror_and_ret(, "pthread_create()");
-
-	return;
-*/
 }
 
 static void
 stop_draw(void)
 {
-/*
-	if ((errno = pthread_cancel(draw_thread)) != 0)
-		perror_and_ret(, "pthread_cancel()");
+	struct amcs_compositor *ctx = &compositor_ctx;
+	struct amcs_surface *surf;
+	int i;
 
-	if ((errno = pthread_join(draw_thread, NULL)) != 0)
-		perror_and_ret(, "pthread_join()");
-*/
-	amcs_wind_free_screens(screens);
-	screens = NULL;
+	debug("stop_draw");
+	amcs_screens_free(&ctx->screens);
+	for (i = 0; i < pvector_len(&ctx->screen_roots); i++) {
+		struct amcs_wintree *tmp;
+		tmp = pvector_get(&ctx->screens, i);
+		tmp->screen = NULL;
+	}
 }
 
 int
@@ -314,8 +356,11 @@ amcs_compositor_init(struct amcs_compositor *ctx)
 	ctx->redraw_listener.notify = sig_surfaces_redraw;
 	wl_signal_add(&ctx->redraw_sig, &ctx->redraw_listener);
 
-	return 0;
+	pvector_init(&ctx->screens, xrealloc);
+	pvector_init(&ctx->screen_roots, xrealloc);
+	pvector_init(&ctx->cur_wins, xrealloc);
 
+	return 0;
 finalize:
 	amcs_compositor_deinit(ctx);
 	return 1;
@@ -335,13 +380,13 @@ main(int argc, const char *argv[])
 {
 	int rc;
 
+	if (amcs_compositor_init(&compositor_ctx) != 0)
+		return 1;
+
 	debug("tty init");
 	amcs_tty_open(0);
 	amcs_tty_sethand(start_draw, stop_draw);
 	amcs_tty_activate();
-
-	if (amcs_compositor_init(&compositor_ctx) != 0)
-		return 1;
 
 	debug("event loop dispatch");
 	while (1) {
