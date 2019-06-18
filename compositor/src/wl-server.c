@@ -246,7 +246,8 @@ start_draw(void)
 
 	debug("start draw");
 	cards = amcs_udev_get_cardnames();
-	//TODO: flush screens
+
+	assert(pvector_len(&ctx->screens) == 0);
 
 	for (i = 0; cards[i] != NULL; ++i) {
 		snprintf(path, sizeof(path), "%s%s", DRIPATH, cards[i]);
