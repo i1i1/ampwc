@@ -19,7 +19,8 @@
 
 typedef struct tty_dev {
 	int fd;
-	int num;
+	int orig;	//initial vt number
+	int num;	//vt number for compositor
 	char *path;
 	int state;
 } tty_dev;
@@ -87,6 +88,19 @@ tty_release(int sig)
 	pthread_mutex_unlock(&signal_mux);
 }
 
+static int
+tty_get_current(int fd)
+{
+	struct vt_stat st;
+	memset(&st, 0, sizeof(st));
+
+	if (ioctl(fd, VT_GETSTATE, &st)) {
+		perror("ioctl(dev->fd, VT_GETSTATE, &st)");
+		exit(1);
+	}
+	return st.v_active;
+}
+
 void
 amcs_tty_open(unsigned int num)
 {
@@ -115,12 +129,14 @@ amcs_tty_open(unsigned int num)
 			perror("ioctl(fd, VT_OPENQRY, &num)");
 			exit(1);
 		}
+		dev->orig = tty_get_current(fd);
 
 		if (close(fd) < 0) {
 			perror("close(fd)");
 			exit(1);
 		}
-
+	} else {
+		dev->orig = num;
 	}
 
 	dev->num = num;
@@ -142,6 +158,21 @@ amcs_tty_open(unsigned int num)
 
 	if (ioctl(dev->fd, KDSETMODE, KD_GRAPHICS)) {
 		perror("ioctl(dev->fd, KDSETMODE, KD_GRAPHICS)");
+		exit(1);
+	}
+}
+
+void
+amcs_tty_restore_term()
+{
+	int current;
+	current = tty_get_current(dev->fd);
+
+	if (current != dev->num || current == dev->orig) {
+		return;
+	}
+	if (ioctl(dev->fd, VT_ACTIVATE, dev->orig)) {
+		perror("ioctl(dev->fd, VT_ACTIVATE, dev->num)");
 		exit(1);
 	}
 }

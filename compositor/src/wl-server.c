@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -281,7 +282,7 @@ start_draw(void)
 		amcs_wintree_set_screen(rootarr[i], sarr[i]);
 	}
 	pvector_reserve(&ctx->cur_wins, pvector_len(&ctx->screens));
-	pvector_clear(&ctx->cur_wins);
+	pvector_zero(&ctx->cur_wins);
 
 	amcs_udev_free_cardnames(cards);
 }
@@ -293,13 +294,17 @@ stop_draw(void)
 	struct amcs_surface *surf;
 	int i;
 
-	debug("stop_draw");
+	debug("stop_draw nscreens %zd", pvector_len(&ctx->screens));
+	if (pvector_len(&ctx->screens) == 0)
+		return;
+
 	amcs_screens_free(&ctx->screens);
 	for (i = 0; i < pvector_len(&ctx->screen_roots); i++) {
 		struct amcs_wintree *tmp;
-		tmp = pvector_get(&ctx->screens, i);
+		tmp = pvector_get(&ctx->screen_roots, i);
 		tmp->screen = NULL;
 	}
+	pvector_clear(&ctx->screens);
 }
 
 int
@@ -375,10 +380,28 @@ amcs_compositor_deinit(struct amcs_compositor *ctx)
 		wl_global_destroy(ctx->comp);
 }
 
+
+static void
+term_handler(int signo)
+{
+	struct sigaction act = {0};
+	sigset_t set;
+
+	sigemptyset(&set);
+	act.sa_handler = SIG_DFL;
+	sigaction(signo, &act, NULL);
+
+	stop_draw();
+	amcs_tty_restore_term();
+	raise(signo);
+}
+
 int
 main(int argc, const char *argv[])
 {
 	int rc;
+	struct sigaction act = {0};
+	sigset_t set;
 
 	if (amcs_compositor_init(&compositor_ctx) != 0)
 		return 1;
@@ -387,6 +410,15 @@ main(int argc, const char *argv[])
 	amcs_tty_open(0);
 	amcs_tty_sethand(start_draw, stop_draw);
 	amcs_tty_activate();
+
+	sigemptyset(&set);
+	act.sa_handler = term_handler;
+
+	sigaction(SIGINT, &act, NULL);
+	sigaction(SIGTERM, &act, NULL);
+	sigaction(SIGSEGV, &act, NULL);
+
+	atexit(stop_draw);
 
 	debug("event loop dispatch");
 	while (1) {

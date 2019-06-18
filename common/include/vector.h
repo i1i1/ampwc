@@ -44,6 +44,7 @@ void vector_pop(vector *v);
 
 int vector_add(vector *v, size_t idx, const void *val);
 void vector_del(vector *v, size_t idx);
+void vector_clear(vector *v);
 
 // Pointer vector
 static inline void pvector_init(pvector *v, void *(*real)(void *, size_t))
@@ -101,6 +102,12 @@ static inline void pvector_del(pvector *v, size_t idx)
 }
 
 static inline void pvector_clear(pvector *v)
+{
+	v->v.nmemb = 0;
+
+}
+
+static inline void pvector_zero(pvector *v)
 {
 	memset(v->v.data, 0, sizeof(void*) * v->v.maxnmemb);
 }

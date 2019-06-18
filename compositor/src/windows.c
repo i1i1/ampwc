@@ -151,7 +151,7 @@ amcs_wintree_insert(struct amcs_wintree *wt, struct amcs_win *w, int pos)
 	assert(wt && wt->type == WT_TREE && w->type == WT_WIN);
 
 	warning("rewrite that, refactor vector.[ch]");
-	debug("insert %p, into %p nsubwinds %d", w, wt, pvector_len(&wt->subwins));
+	debug("insert %p, into %p nsubwinds %zd", w, wt, pvector_len(&wt->subwins));
 	pvector_push(&wt->subwins, w);
 	w->parent = wt;
 	amcs_wintree_resize_subwins(wt);

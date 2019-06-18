@@ -161,6 +161,12 @@ vector_del(vector *v, size_t idx)
 	v->nmemb--;
 }
 
+void
+vector_clear(vector *v)
+{
+	v->nmemb = 0;
+}
+
 int
 vector_push(vector *v, const void *val)
 {
