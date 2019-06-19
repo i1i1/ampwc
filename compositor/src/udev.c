@@ -204,6 +204,7 @@ monitor_tracking(void *args)
 
 		send_changes();
 	}
+	udev_unref(udev);
 
 	return NULL;
 }

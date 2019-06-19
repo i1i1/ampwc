@@ -1,7 +1,7 @@
 #ifndef WL_SERVER_H_
 #define WL_SERVER_H_
 
-#include "windows.h"
+#include "window.h"
 #include "vector.h"
 
 struct amcs_surface {

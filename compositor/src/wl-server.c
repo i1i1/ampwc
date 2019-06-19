@@ -16,7 +16,7 @@
 #include "xdg-shell.h"
 
 #include "udev.h"
-#include "windows.h"
+#include "window.h"
 #include "tty.h"
 
 struct amcs_compositor compositor_ctx = {0};
@@ -162,12 +162,15 @@ surf_commit(struct wl_client *client, struct wl_resource *resource)
 	data = wl_shm_buffer_get_data(buf);
 	debug("data = %p", data);
 	if (mysurf->aw) {
+		int bufsz;
 		debug("try to commit buf, x %d y %d", x, y);
 		//dirty hack
-		mysurf->aw->buf = xmalloc(x * y * 4);
-		debug("1");
+		bufsz = x * y * 4;
+		if (mysurf->aw->bufsz < bufsz)
+			mysurf->aw->buf = xrealloc(mysurf->aw->buf, bufsz);
+		mysurf->aw->bufsz = bufsz;
+
 		memcpy(mysurf->aw->buf, data, x * y * 4);
-		debug("2");
 		amcs_win_commit(mysurf->aw);
 	}
 	debug("data[0] = %x", ((uint8_t*)data)[0]);

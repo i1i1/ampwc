@@ -43,8 +43,10 @@ struct amcs_win {
 	struct amcs_wintree *parent;
 	int w, h;
 	int x, y;
+
 	//TEMP!!!!
 	uint32_t *buf;
+	int bufsz;
 };
 
 struct amcs_screen {

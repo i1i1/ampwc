@@ -5,7 +5,7 @@
 #include "drm.h"
 #include "macro.h"
 #include "udev.h"
-#include "windows.h"
+#include "window.h"
 
 static struct amcs_wintree *
 win_get_root(struct amcs_win *w)
@@ -236,6 +236,8 @@ amcs_win_free(struct amcs_win *w)
 {
 	assert(w && w->type == WT_WIN);
 	amcs_win_orphain(w);
+	if (w->buf)
+		free(w->buf);
 	free(w);
 }
 
@@ -306,7 +308,6 @@ amcs_win_commit(struct amcs_win *w)
 		return -1;
 
 	screen = root->screen;
-	debug("commit stuff");
 	for (i = 0; i < w->h; ++i) {
 		for (j = 0; j < w->w; ++j) {
 			offset = screen->pitch * (i + w->y) + 4*(j + w->x);

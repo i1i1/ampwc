@@ -1,3 +1,4 @@
+#include <alloca.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -143,7 +144,7 @@ amcs_tty_open(unsigned int num)
 	str = uitoa(dev->num);
 
 	size = sizeof ("/dev/tty") + strlen(str);
-	path = xmalloc(size);
+	path = alloca(size);
 
 	strcpy(path, "/dev/tty");
 	dev->path = path = strcat(path, str);

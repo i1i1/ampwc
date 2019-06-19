@@ -123,6 +123,7 @@ window_init(struct amcs_surface *mysurf)
 	serial = wl_display_next_serial(compositor_ctx.display);
 	mysurf->pending.xdg_serial = serial;
 	debug("generated serial = %d", serial);
+	//TODO: newst??????
 	newst = wl_array_add(&mysurf->surf_states, sizeof(*newst));
 	*newst = XDG_TOPLEVEL_STATE_ACTIVATED;
 
