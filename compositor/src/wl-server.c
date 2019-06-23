@@ -382,6 +382,8 @@ amcs_compositor_deinit(struct amcs_compositor *ctx)
 		wl_display_destroy(ctx->display);
 	if (ctx->comp)
 		wl_global_destroy(ctx->comp);
+	xdg_shell_finalize(ctx);
+	seat_finalize(ctx);
 }
 
 

@@ -252,3 +252,11 @@ xdg_shell_init(struct amcs_compositor *ctx)
 	return 0;
 }
 
+int
+xdg_shell_finalize(struct amcs_compositor *ctx)
+{
+	if (ctx->shell)
+		wl_global_destroy(ctx->shell);
+	return 0;
+}
+

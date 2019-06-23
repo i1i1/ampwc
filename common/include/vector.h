@@ -52,6 +52,11 @@ static inline void pvector_init(pvector *v, void *(*real)(void *, size_t))
 	vector_init(&v->v, sizeof(void *), real);
 }
 
+static inline void pvector_free(pvector *v)
+{
+	vector_free(&v->v);
+}
+
 static inline void pvector_initdata(pvector *v, void *arr, size_t nmemb, void *(*real)(void *, size_t))
 {
 	vector_initdata(&v->v, arr, nmemb, sizeof(void *), real);
