@@ -65,7 +65,7 @@ toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel,
 	debug("wl_buffer created = %p", ctx->buf);
 
 	//xdg_surface_set_window_geometry(ctx->xdgsurf, 0, 0, 600, 800);
-	wl_surface_attach(ctx->surf, ctx->buf, ctx->w, ctx->h);
+	wl_surface_attach(ctx->surf, ctx->buf, 0, 0);
 	wl_surface_commit(ctx->surf);
 }
 
@@ -192,6 +192,8 @@ main(int argc, const char *argv[])
 		error(2, "can't get xdg_shell interface");
 	if (g_ctx.shm == NULL)
 		error(3, "can't get shm");
+	if (g_ctx.seat == NULL)
+		error(4, "can't get seat");
 
 	shm_pool_init(&g_ctx);
 
@@ -200,6 +202,7 @@ main(int argc, const char *argv[])
 		warning("can't get surface");
 		goto finalize;
 	}
+	//TODO: wl_seat test
 
 	g_ctx.xdgsurf = xdg_wm_base_get_xdg_surface(g_ctx.shell, g_ctx.surf);
 	g_ctx.toplevel = xdg_surface_get_toplevel(g_ctx.xdgsurf);

@@ -150,7 +150,6 @@ amcs_wintree_insert(struct amcs_wintree *wt, struct amcs_win *w, int pos)
 {
 	assert(wt && wt->type == WT_TREE && w->type == WT_WIN);
 
-	warning("rewrite that, refactor vector.[ch]");
 	debug("insert %p, into %p nsubwinds %zd", w, wt, pvector_len(&wt->subwins));
 	pvector_push(&wt->subwins, w);
 	w->parent = wt;
@@ -217,7 +216,7 @@ amcs_wintree_remove_all(struct amcs_wintree *wt)
 }
 
 struct amcs_win *
-amcs_win_new(struct amcs_wintree *par)
+amcs_win_new(struct amcs_wintree *par, win_update_cb cb, void *opaq)
 {
 	struct amcs_win *res;
 
@@ -225,6 +224,8 @@ amcs_win_new(struct amcs_wintree *par)
 	res = xmalloc(sizeof(*res));
 	memset(res, 0, sizeof(*res));
 	res->type = WT_WIN;
+	res->upd_cb = cb;
+	res->upd_opaq = opaq;
 	if (par)
 		amcs_wintree_insert(par, res, -1);
 
@@ -236,17 +237,22 @@ amcs_win_free(struct amcs_win *w)
 {
 	assert(w && w->type == WT_WIN);
 	amcs_win_orphain(w);
-	if (w->buf)
-		free(w->buf);
+	if (w->buf.dt)
+		free(w->buf.dt);
 	free(w);
 }
 
 static int
 _commit_cb(struct amcs_win *w, void *opaq)
 {
+	int rc;
 	debug("commit cb");
-	if (w && w->type == WT_WIN && w->buf) {
+	if (w && w->type == WT_WIN && w->buf.dt) {
 		amcs_win_commit(w);
+		if (w->upd_cb) {
+			rc = w->upd_cb(w, w->upd_opaq);
+			assert(rc == 0 || "TODO: writeme");
+		}
 	}
 	return 0;
 }
@@ -295,23 +301,25 @@ amcs_wintree_resize_subwins(struct amcs_wintree *wt)
 }
 
 int
-amcs_win_commit(struct amcs_win *w)
+amcs_win_commit(struct amcs_win *win)
 {
 	struct amcs_wintree *root;
 	struct amcs_screen *screen;
-	int i, j;
+	int i, j, h, w;
 	size_t offset;
 
-	root = win_get_root(w);
+	root = win_get_root(win);
 	debug("get root %p", root);
 	if (root->screen == NULL)
 		return -1;
 
+	h = MIN(win->h, win->buf.h);
+	w = MIN(win->w, win->buf.w);
 	screen = root->screen;
-	for (i = 0; i < w->h; ++i) {
-		for (j = 0; j < w->w; ++j) {
-			offset = screen->pitch * (i + w->y) + 4*(j + w->x);
-			*(uint32_t*)&screen->buf[offset] = w->buf[w->w * i + j];
+	for (i = 0; i < h; ++i) {
+		for (j = 0; j < w; ++j) {
+			offset = screen->pitch * (i + win->y) + 4*(j + win->x);
+			*(uint32_t*)&screen->buf[offset] = win->buf.dt[win->buf.w * i + j];
 		}
 	}
 

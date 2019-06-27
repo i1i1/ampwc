@@ -8,11 +8,13 @@
 
 #define DRIPATH "/dev/dri/"
 
-
 /*
  * amcs_wintree -- container for child windows / splits.
  * root wintree has no parent
  */
+struct amcs_win;
+struct amcs_wintree;
+struct amcs_screen;
 
 enum win_objtype {
 	WT_TREE = 0,
@@ -37,16 +39,25 @@ struct amcs_wintree {
 	struct amcs_screen *screen; // NOTE: Valid only for root wtree
 };
 
+struct amcs_buf {
+	uint32_t *dt;
+	int h, w;
+	int sz;
+};
+
+/* Notify callback for window resize */
+typedef int (*win_update_cb)(struct amcs_win *w, void *opaq);
 #define AMCS_WIN(v) ((struct amcs_win *)v)
 struct amcs_win {
 	enum win_objtype type;
 	struct amcs_wintree *parent;
+
 	int w, h;
 	int x, y;
 
-	//TEMP!!!!
-	uint32_t *buf;
-	int bufsz;
+	struct amcs_buf buf;
+	win_update_cb upd_cb;
+	void *upd_opaq;
 };
 
 struct amcs_screen {
@@ -67,7 +78,7 @@ void amcs_wintree_set_screen(struct amcs_wintree *wt, struct amcs_screen *screen
 int amcs_wintree_pass(struct amcs_wintree *wt, wintree_pass_cb cb, void *data);
 
 // amcs_win stuff
-struct amcs_win *amcs_win_new(struct amcs_wintree *par);
+struct amcs_win *amcs_win_new(struct amcs_wintree *par, win_update_cb cb, void *opaq);
 void amcs_win_free(struct amcs_win *w);
 
 /*

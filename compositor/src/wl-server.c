@@ -10,6 +10,7 @@
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 
+#include "common.h"
 #include "macro.h"
 #include "seat.h"
 #include "wl-server.h"
@@ -95,13 +96,13 @@ delete_surface(struct wl_resource *resource)
 	amcs_surface_free(mysurf);
 }
 
-void
+static void
 surf_delete(struct wl_client *client, struct wl_resource *resource)
 {
 	wl_resource_destroy(resource);
 }
 
-void
+static void
 surf_attach(struct wl_client *client, struct wl_resource *resource,
 	struct wl_resource *buffer, int32_t x, int32_t y)
 {
@@ -120,7 +121,7 @@ surf_attach(struct wl_client *client, struct wl_resource *resource,
 	mysurf->pending.buf = wl_shm_buffer_get(buffer);
 }
 
-void
+static void
 surf_damage(struct wl_client *client, struct wl_resource *resource,
 	int32_t x, int32_t y, int32_t width, int32_t height)
 {
@@ -132,14 +133,29 @@ surf_damage(struct wl_client *client, struct wl_resource *resource,
 	(void)mysurf;
 }
 
-void
+static void
 surf_frame(struct wl_client *client, struct wl_resource *resource,
 	uint32_t callback)
 {
 	debug("%p", resource);
 }
 
-void
+static void
+surf_set_opaque_region(struct wl_client *client,
+	struct wl_resource *resource, struct wl_resource *region)
+{
+	warning("");
+}
+
+static void
+surf_set_input_region(struct wl_client *client,
+	 struct wl_resource *resource,
+	 struct wl_resource *region)
+{
+	warning("");
+}
+
+static void
 surf_commit(struct wl_client *client, struct wl_resource *resource)
 {
 	struct amcs_surface *mysurf;
@@ -150,33 +166,64 @@ surf_commit(struct wl_client *client, struct wl_resource *resource)
 	mysurf = wl_resource_get_user_data(resource);
 	buf = mysurf->pending.buf;
 	debug("recieved commit, need to redraw stuff");
+	if (buf == NULL) {
+		warning("nothing to commit, ignore request");
+		return;
+	}
 
 	x = mysurf->pending.x;
 	y = mysurf->pending.y;
 	if (mysurf->w + x < 0 || mysurf->h + y < 0) {
-		error(1, "wrong resize, negative coordinates");
-		return;
+		error(1, "TODO, negative coordinates");
 	}
 	wl_shm_buffer_begin_access(buf);
 
 	data = wl_shm_buffer_get_data(buf);
 	debug("data = %p", data);
 	if (mysurf->aw) {
-		int bufsz;
-		debug("try to commit buf, x %d y %d", x, y);
-		//dirty hack
-		bufsz = x * y * 4;
-		if (mysurf->aw->bufsz < bufsz)
-			mysurf->aw->buf = xrealloc(mysurf->aw->buf, bufsz);
-		mysurf->aw->bufsz = bufsz;
+		int bufsz, h, w;
+		int format;
 
-		memcpy(mysurf->aw->buf, data, x * y * 4);
+		h = wl_shm_buffer_get_height(buf);
+		w = wl_shm_buffer_get_width(buf);
+		debug("try to commit buf, (x, y) (%d, %d), (w, h) (%d, %d)",
+		      x, y, w, h);
+
+		format = wl_shm_buffer_get_format(buf);
+		if (format != WL_SHM_FORMAT_ARGB8888 &&
+		    format != WL_SHM_FORMAT_XRGB8888) {
+			warning("unknown buffer format, ignore");
+			goto finalize;
+		}
+
+		bufsz = h * w * 4;
+		if (mysurf->aw->buf.sz < bufsz)
+			mysurf->aw->buf.dt = xrealloc(mysurf->aw->buf.dt, bufsz);
+		mysurf->aw->buf.sz = bufsz;
+		mysurf->aw->buf.h = h;
+		mysurf->aw->buf.w = w;
+
+		memcpy(mysurf->aw->buf.dt, data, bufsz);
 		amcs_win_commit(mysurf->aw);
 	}
 	debug("data[0] = %x", ((uint8_t*)data)[0]);
+finalize:
 	wl_shm_buffer_end_access(buf);
 	debug("end!");
+}
 
+static void
+surf_set_buffer_transform(struct wl_client *client,
+	struct wl_resource *resource, int32_t transform)
+{
+	warning("");
+}
+
+static void
+surf_set_buffer_scale(struct wl_client *client,
+	struct wl_resource *resource, int32_t scale)
+{
+	warning("");
 }
 
 struct wl_surface_interface surface_interface = {
@@ -184,9 +231,11 @@ struct wl_surface_interface surface_interface = {
 	.attach = surf_attach,
 	.damage = surf_damage,
 	.frame = surf_frame,
-	NULL, //set_opaque_region
-	NULL, //set_input_region
+	.set_opaque_region = surf_set_opaque_region, //set_opaque_region
+	.set_input_region = surf_set_input_region, //set_input_region
 	.commit = surf_commit,
+	.set_buffer_transform = surf_set_buffer_transform,
+	.set_buffer_scale = surf_set_buffer_scale,
 };
 
 
@@ -202,15 +251,47 @@ compositor_create_surface(struct wl_client *client,
 	wl_list_insert(&comp->surfaces, &mysurf->link);
 
 	debug("create surface wl_client = %p, id = %d, surf = %p", client, id, mysurf);
-	mysurf->res = wl_resource_create(client, &wl_surface_interface, wl_resource_get_version(resource), id);
+	RESOURCE_CREATE(mysurf->res, client, &wl_surface_interface, wl_resource_get_version(resource), id);
 	wl_resource_set_implementation(mysurf->res, &surface_interface, mysurf, delete_surface);
 }
+
+static void
+region_destroy(struct wl_client *client, struct wl_resource *resource)
+{
+	warning("");
+}
+
+static void
+region_add(struct wl_client *client, struct wl_resource *resource,
+	int32_t x, int32_t y, int32_t width, int32_t height)
+{
+	warning("");
+}
+
+static void
+region_subtract(struct wl_client *client, struct wl_resource *resource,
+	int32_t x, int32_t y, int32_t width, int32_t height)
+{
+	warning("");
+}
+
+struct wl_region_interface region_interface = {
+	.destroy = region_destroy,
+	.add = region_add,
+	.subtract = region_subtract,
+};
 
 static void
 compositor_create_region(struct wl_client *client,
 			 struct wl_resource *resource, uint32_t id)
 {
+	struct wl_resource *res;
+
+	//TODO
 	debug("create region wl_client = %p, id = %d", client, id);
+	RESOURCE_CREATE(res, client, &wl_region_interface,
+			wl_resource_get_version(resource), id);
+	wl_resource_set_implementation(res, &region_interface, resource, NULL);
 }
 
 static const struct wl_compositor_interface compositor_interface = {
@@ -225,13 +306,7 @@ bind_compositor(struct wl_client *client, void *data, uint32_t version, uint32_t
 
 	debug("");
 
-	resource = wl_resource_create(client, &wl_compositor_interface,
-				      version, id);
-	if (resource == NULL) {
-		wl_client_post_no_memory(client);
-		return;
-	}
-
+	RESOURCE_CREATE(resource, client, &wl_compositor_interface, version, id);
 	wl_resource_set_implementation(resource, &compositor_interface,
 				       data, NULL);
 }

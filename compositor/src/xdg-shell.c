@@ -7,6 +7,7 @@
 
 #include "xdg-shell-server.h"
 
+#include "common.h"
 #include "macro.h"
 #include "wl-server.h"
 
@@ -19,79 +20,79 @@ destroy(struct wl_client *client, struct wl_resource *resource)
 static void
 xsurf_set_parent(struct wl_client *client, struct wl_resource *resource, struct wl_resource *parent_resource)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_set_title(struct wl_client *client, struct wl_resource *resource, const char *title)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_set_app_id(struct wl_client *client, struct wl_resource *resource, const char *app_id)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_show_window_menu(struct wl_client *client, struct wl_resource *resource, struct wl_resource *seat, uint32_t serial, int32_t x, int32_t y)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_move(struct wl_client *client, struct wl_resource *resource, struct wl_resource *seat, uint32_t serial)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_resize(struct wl_client *client, struct wl_resource *resource, struct wl_resource *seat, uint32_t serial, uint32_t edges)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_set_max_size(struct wl_client *client, struct wl_resource *resource, int32_t width, int32_t height)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_set_min_size(struct wl_client *client, struct wl_resource *resource, int32_t width, int32_t height)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_set_maximized(struct wl_client *client, struct wl_resource *resource)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_unset_maximized(struct wl_client *client, struct wl_resource *resource)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_set_fullscreen(struct wl_client *client, struct wl_resource *resource, struct wl_resource *output)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_unset_fullscreen(struct wl_client *client, struct wl_resource *resource)
 {
-	debug("");
+	warning("");
 }
 
 static void
 xsurf_set_minimized(struct wl_client *client, struct wl_resource *resource)
 {
-	debug("");
+	warning("");
 }
 
 static const struct xdg_toplevel_interface toplevel_interface = {
@@ -111,7 +112,38 @@ static const struct xdg_toplevel_interface toplevel_interface = {
 	.set_minimized = xsurf_set_minimized,
 };
 
-void
+int
+window_update_cb(struct amcs_win *win, void *opaq)
+{
+	struct amcs_surface *surf;
+	uint32_t serial;
+	uint32_t *p;
+	struct wl_array arr;
+
+	surf = opaq;
+	if (win->w == win->buf.w &&
+	    win->h == win->buf.h)
+		return 0;
+
+	surf->w = win->w;
+	surf->h = win->h;
+
+	wl_array_init(&arr);
+	p = wl_array_add(&arr, sizeof(*p));
+	*p = XDG_TOPLEVEL_STATE_ACTIVATED;
+	p = wl_array_add(&arr, sizeof(*p));
+	*p = XDG_TOPLEVEL_STATE_RESIZING;
+
+	xdg_toplevel_send_configure(surf->xdgtopres, win->w, win->h, &arr);
+	serial = wl_display_next_serial(compositor_ctx.display);
+	surf->pending.xdg_serial = serial;
+	xdg_surface_send_configure(surf->xdgres, serial);
+
+	wl_array_release(&arr);
+	return 0;
+}
+
+static void
 window_init(struct amcs_surface *mysurf)
 {
 	struct amcs_win *old;
@@ -134,9 +166,9 @@ window_init(struct amcs_surface *mysurf)
 	if (old == NULL) {
 		struct amcs_wintree *wt;
 		wt = pvector_get(&compositor_ctx.screen_roots, nroot);
-		mysurf->aw = amcs_win_new(wt);
+		mysurf->aw = amcs_win_new(wt, window_update_cb, mysurf);
 	} else {
-		mysurf->aw = amcs_win_new(old->parent);
+		mysurf->aw = amcs_win_new(old->parent, window_update_cb, mysurf);
 	}
 	pvector_set(&compositor_ctx.cur_wins, nroot, mysurf->aw);
 
@@ -156,7 +188,7 @@ surf_get_toplevel(struct wl_client *client,
 	mysurf = wl_resource_get_user_data(resource);
 
 	debug("mysurf %p", mysurf);
-	mysurf->xdgtopres = wl_resource_create(client, &xdg_toplevel_interface, wl_resource_get_version(resource), id);
+	RESOURCE_CREATE(mysurf->xdgtopres, client,  &xdg_toplevel_interface, wl_resource_get_version(resource), id);
 	wl_resource_set_implementation(mysurf->xdgtopres, &toplevel_interface, mysurf, NULL);
 
 	window_init(mysurf);
@@ -228,13 +260,7 @@ bind_shell(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 
 	debug("");
 
-	resource = wl_resource_create(client, &xdg_wm_base_interface,
-				      version, id);
-	if (resource == NULL) {
-		wl_client_post_no_memory(client);
-		return;
-	}
-
+	RESOURCE_CREATE(resource, client, &xdg_wm_base_interface, version, id);
 	wl_resource_set_implementation(resource, &xdg_base_interface,
 				       data, NULL);
 }
