@@ -1,3 +1,6 @@
+Q = @
+PREF := $(strip $(PREF))
+
 # in order to preserve user variables
 _SRC = $(SRC) $(wildcard src/*.c)
 _HDR = $(HDR) $(wildcard include/*.h)
@@ -6,24 +9,34 @@ DEP =  $(subst src, build, $(_SRC:.c=.d))
 
 all: $(PRE) $(DEP) $(_OBJ) $(OUT)
 
+define prettify =
+	$(Q)for file in $(2) ; do printf "%-3s %s%s\n" $(1) $(PREF) $$file ; done
+	$(Q)$(3)
+endef
+
 ifneq ($(OUT),)
 $(OUT): $(_OBJ) $(OBJ)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(call prettify, LD, $@, \
+	    $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^)
 endif
 
 $(DEP): $(PRE)
 
 build/%.d: src/%.c
-	$(CC) $(CFLAGS) -MM $< | sed -e "s!^[^ \t]\+\.o:!build/&!" > $@
+	$(call prettify, DEP, $<, \
+        $(CC) $(CFLAGS) -MM $< | sed -e "s!^[^ \t]\+\.o:!build/&!" > $@)
 
 build/%.o: src/%.c build/%.d
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(call prettify, CC, $<, \
+	    $(CC) $(CFLAGS) -c $< -o $@)
 
 clean: userclean
-	rm -f $(_OBJ) $(OUT)
+	$(call prettify, RM, $(_OBJ) $(OUT), \
+	    rm -f $(_OBJ) $(OUT))
 
 fullclean: clean
-	rm -f $(DEP)
+	$(call prettify, RM, $(DEP), \
+	    rm -f $(DEP))
 
 .PHONY: clean userclean fullclean all
 .SECONDARY: $(DEP)

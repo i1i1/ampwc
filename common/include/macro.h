@@ -7,6 +7,8 @@
 
 #define STREQ(a, b)  (strcmp(a, b) == 0)
 #define STRNEQ(a, b) (strcmp(a, b) != 0)
+#define MIN(a, b) (((a) > (b)) ? (b) : (a))
+#define MAX(a, b) (((a) < (b)) ? (b) : (a))
 
 #define ARRSZ(arr) (sizeof(arr) / sizeof(arr[0]))
 

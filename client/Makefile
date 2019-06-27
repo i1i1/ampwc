@@ -13,13 +13,16 @@ XDG_PROTO = ../xdg-shell.xml
 include ../common/gener.mk
 
 $(PRE): $(XDG_PROTO)
-	wayland-scanner client-header $< $@
+	$(call prettify, GEN, $@, \
+	    wayland-scanner client-header $< $@)
 
 test: all
-	$(TERM) -e "$(OUT); cat >/dev/null"
+	$(call prettify, RUN, $(OUT), \
+	    $(TERM) -e "$(OUT); cat >/dev/null")
 
 userclean:
-	rm -f $(PRE)
+	$(call prettify, RM, $(PRE), \
+	    rm -f $(PRE))
 
 .PHONY: test
 

@@ -5,17 +5,21 @@
 #include <sys/mman.h>
 
 #include <string.h>
+#include <unistd.h>
 
 #include <wayland-client.h>
+
+//
+#include <time.h>
 
 #include "xdg-shell-client.h"
 #include "macro.h"
 #include "utils.h"
 
-#define WIN_WIDTH 800
-#define WIN_HEIGHT 600
+#define POOL_SZ 8 * 1024 * 1024
 
 struct client_ctx {
+	struct wl_display *disp;
 	struct wl_compositor *comp;
 	struct wl_shm *shm;
 	struct wl_shm_pool *pool;
@@ -43,12 +47,26 @@ toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel,
 	int32_t width, int32_t height, struct wl_array *states)
 {
 	struct client_ctx *ctx;
+	int bufsz, stride;
 
 	debug("width = %d, height = %d", width, height);
 
 	ctx = data;
 	ctx->h = height;
 	ctx->w = width;
+	stride =  ctx->w * 4;
+	bufsz = stride * ctx->h;
+	debug("stride %d", stride);
+
+	if (bufsz > POOL_SZ)
+		error(1, "pool is to small");
+
+	ctx->buf = wl_shm_pool_create_buffer(ctx->pool, 0, ctx->w, ctx->h, stride, WL_SHM_FORMAT_ARGB8888);
+	debug("wl_buffer created = %p", ctx->buf);
+
+	//xdg_surface_set_window_geometry(ctx->xdgsurf, 0, 0, 600, 800);
+	wl_surface_attach(ctx->surf, ctx->buf, 0, 0);
+	wl_surface_commit(ctx->surf);
 }
 
 void
@@ -107,45 +125,33 @@ struct wl_registry_listener registry_listener = {
 	.global_remove = global_remove
 };
 
-void
-paint_init(struct client_ctx *ctx)
+static void
+shm_pool_init(struct client_ctx *ctx)
 {
 	int fd;
-	int stride, mapsz;
 
 	fd = tempfile();
 
-	ctx->h = WIN_HEIGHT;
-	ctx->w = WIN_WIDTH;
+	posix_fallocate(fd, 0, POOL_SZ);
 
-	stride =  ctx->w * 4;
-	mapsz = stride * ctx->h;
+	ctx->data = mmap(NULL, POOL_SZ, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (ctx->data == NULL)
+		error(1, "mmap error :-(");
+	ctx->datasz = POOL_SZ;
 
-	debug("pain_init stride %d!", stride);
-	posix_fallocate(fd, 0, mapsz);
+	srandom(time(NULL));
+	memset(ctx->data, random() & 0xff, POOL_SZ);
 
-	ctx->data = mmap(NULL, mapsz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (ctx->data == NULL) {
-		warning("mmap error :-(");
-		exit(1);
-	}
-	ctx->datasz = mapsz;
-	memset(ctx->data, 0x42, mapsz);
-
-	ctx->pool = wl_shm_create_pool(ctx->shm, fd, mapsz);
-
-	ctx->buf = wl_shm_pool_create_buffer(ctx->pool, 0, ctx->w, ctx->h, stride, WL_SHM_FORMAT_ARGB8888);
-	debug("wl_buffer created = %p", ctx->buf);
-
-
-	//xdg_surface_set_window_geometry(ctx->xdgsurf, 0, 0, 600, 800);
-	wl_surface_attach(ctx->surf, ctx->buf, ctx->w, ctx->h);
-	wl_surface_commit(ctx->surf);
+	ctx->pool = wl_shm_create_pool(ctx->shm, fd, POOL_SZ);
+	if (ctx->pool == NULL)
+		error(1, "can't create shm pool :-(");
+	close(fd);
 }
 
 void
 paint_surface(struct wl_surface *surf)
 {
+	srandom(time(NULL));
 	memset(g_ctx.data, random() & 0xff, g_ctx.datasz);
 	wl_surface_commit(surf);
 }
@@ -159,6 +165,8 @@ main(int argc, const char *argv[])
 	if (display == NULL)
 		error(1, "can't connect to display");
 
+	g_ctx.disp = display;
+
 	struct wl_registry *registry = wl_display_get_registry(display);
 
 	if (registry == NULL)
@@ -170,7 +178,6 @@ main(int argc, const char *argv[])
 		warning("wl_registry_add_listener rc = %d", rc);
 		goto finalize;
 	}
-
 	debug("roundtrip");
 	wl_display_roundtrip(display);
 
@@ -183,19 +190,26 @@ main(int argc, const char *argv[])
 		error(1, "can't get compositor interface");
 	if (g_ctx.shell == NULL)
 		error(2, "can't get xdg_shell interface");
+	if (g_ctx.shm == NULL)
+		error(3, "can't get shm");
+	if (g_ctx.seat == NULL)
+		error(4, "can't get seat");
+
+	shm_pool_init(&g_ctx);
 
 	g_ctx.surf = wl_compositor_create_surface(g_ctx.comp);
 	if (!g_ctx.surf) {
 		warning("can't get surface");
 		goto finalize;
 	}
+	//TODO: wl_seat test
+
 	g_ctx.xdgsurf = xdg_wm_base_get_xdg_surface(g_ctx.shell, g_ctx.surf);
 	g_ctx.toplevel = xdg_surface_get_toplevel(g_ctx.xdgsurf);
 
 	xdg_surface_add_listener(g_ctx.xdgsurf, &xdgsurf_listener, &g_ctx);
 	xdg_toplevel_add_listener(g_ctx.toplevel, &toplevel_listener, &g_ctx);
-
-	paint_init(&g_ctx);
+	wl_display_roundtrip(display);
 
 	debug("start dispatching stuff");
 	niter = 0;

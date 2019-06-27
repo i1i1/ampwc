@@ -1,6 +1,9 @@
 #ifndef WL_SERVER_H_
 #define WL_SERVER_H_
 
+#include "window.h"
+#include "vector.h"
+
 struct amcs_surface {
 	struct wl_resource *res;
 	struct wl_resource *xdgres;
@@ -9,6 +12,7 @@ struct amcs_surface {
 	int w;
 	int h;
 
+	struct amcs_win *aw;
 	struct {
 		struct wl_shm_buffer *buf;
 		int x;
@@ -24,6 +28,7 @@ struct amcs_surface {
 struct amcs_compositor {
 	struct wl_global *comp;
 	struct wl_global *shell;
+	struct wl_global *seat;
 
 	struct wl_display *display;
 	struct wl_event_loop *evloop;
@@ -33,6 +38,11 @@ struct amcs_compositor {
 
 	struct wl_list clients;
 	struct wl_list surfaces;
+
+	//
+	pvector screens;	// struct amcs_screen *
+	pvector screen_roots;	// struct amcs_wtree *
+	pvector cur_wins;	//struct amcs_win *
 
 	struct wl_listener redraw_listener;
 	struct wl_signal redraw_sig;
