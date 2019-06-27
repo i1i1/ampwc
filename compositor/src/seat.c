@@ -314,6 +314,7 @@ seat_init(struct amcs_compositor *ctx)
 	}
 	initialize_seat(&g_seat);
 
+	return 0;
 	wl_event_loop_add_fd(ctx->evloop, g_seat.ifd, WL_EVENT_READABLE, notify_seat, ctx);
 
 	return 0;

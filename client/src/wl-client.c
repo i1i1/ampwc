@@ -139,7 +139,6 @@ shm_pool_init(struct client_ctx *ctx)
 		error(1, "mmap error :-(");
 	ctx->datasz = POOL_SZ;
 
-	srandom(time(NULL));
 	memset(ctx->data, random() & 0xff, POOL_SZ);
 
 	ctx->pool = wl_shm_create_pool(ctx->shm, fd, POOL_SZ);
@@ -151,7 +150,6 @@ shm_pool_init(struct client_ctx *ctx)
 void
 paint_surface(struct wl_surface *surf)
 {
-	srandom(time(NULL));
 	memset(g_ctx.data, random() & 0xff, g_ctx.datasz);
 	wl_surface_commit(surf);
 }
@@ -162,6 +160,7 @@ main(int argc, const char *argv[])
 	struct wl_display *display = wl_display_connect(NULL);
 	int rc, niter;
 
+	srandom(time(NULL));
 	if (display == NULL)
 		error(1, "can't connect to display");
 
