@@ -29,6 +29,7 @@ struct amcs_compositor {
 	struct wl_global *comp;
 	struct wl_global *shell;
 	struct wl_global *seat;
+	struct wl_global *devman;
 
 	struct wl_display *display;
 	struct wl_event_loop *evloop;

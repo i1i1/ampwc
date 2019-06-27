@@ -9,6 +9,7 @@
 
 #include "common.h"
 #include "macro.h"
+#include "seat.h"
 #include "wl-server.h"
 
 static void
@@ -178,6 +179,7 @@ window_init(struct amcs_surface *mysurf)
 	xdg_toplevel_send_configure(mysurf->xdgtopres, mysurf->w, mysurf->h, &mysurf->surf_states);
 
 	xdg_surface_send_configure(mysurf->xdgres, serial);
+	seat_focus(mysurf->xdgres);
 }
 
 static void

@@ -176,6 +176,10 @@ amcs_tty_restore_term()
 		perror("ioctl(dev->fd, VT_ACTIVATE, dev->num)");
 		exit(1);
 	}
+	if (ioctl(dev->fd, VT_WAITACTIVE, dev->orig)) {
+		perror("ioctl(dev->fd, VT_ACTIVATE, dev->num)");
+		exit(1);
+	}
 }
 
 void

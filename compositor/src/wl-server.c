@@ -27,8 +27,7 @@ amcs_surface_new()
 {
 	struct amcs_surface *res;
 
-	res = malloc(sizeof(*res));
-
+	res = xmalloc(sizeof(*res));
 	memset(res, 0, sizeof(*res));
 	wl_array_init(&res->surf_states);
 
@@ -386,6 +385,47 @@ stop_draw(void)
 	pvector_clear(&ctx->screens);
 }
 
+static void
+devman_create_data_source(struct wl_client *client,
+	struct wl_resource *resource, uint32_t id)
+{
+	warning("");
+}
+
+static void
+devman_get_data_device(struct wl_client *client,
+	struct wl_resource *resource, uint32_t id, struct wl_resource *seat)
+{
+	warning("");
+}
+
+static const struct wl_data_device_manager_interface data_device_manager_interface = {
+	.create_data_source = devman_create_data_source,
+	.get_data_device = devman_get_data_device,
+};
+
+static void
+bind_devman(struct wl_client *client, void *data, uint32_t version, uint32_t id)
+{
+	struct wl_resource *resource;
+
+	debug("");
+	RESOURCE_CREATE(resource, client, &wl_data_device_manager_interface, version, id);
+	wl_resource_set_implementation(resource, &data_device_manager_interface, data, NULL);
+}
+
+static int
+device_manager_init(struct amcs_compositor *ctx)
+{
+	ctx->devman = wl_global_create(ctx->display, &wl_data_device_manager_interface, 3, ctx, &bind_devman);
+	if (!ctx->devman) {
+		warning("can't create shell inteface");
+		return 1;
+	}
+	return 0;
+
+}
+
 int
 amcs_compositor_init(struct amcs_compositor *ctx)
 {
@@ -431,7 +471,8 @@ amcs_compositor_init(struct amcs_compositor *ctx)
 	}
 
 	if (xdg_shell_init(ctx) != 0 ||
-	    seat_init(ctx) != 0) {
+	    seat_init(ctx) != 0 ||
+	    device_manager_init(ctx) != 0) {
 		goto finalize;
 	}
 

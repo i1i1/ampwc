@@ -18,26 +18,45 @@
 
 #define SEAT_NAME "seat0"
 
-struct dev_pointer {
-	pvector devs;
-};
+struct seat_connection {
+	struct wl_resource *keyboard;
+	struct wl_resource *pointer;
+	struct wl_resource *seat;
 
-struct dev_keyboard {
-	pvector devs;
+	struct wl_list link;
 };
 
 struct seat {
 	struct libinput *input;
 	struct udev *udev;
-	struct dev_keyboard kbd;
-	struct dev_pointer ptr;
 	int ifd;			// libinput file descriptor
 	int capabilities;
 
-	struct wl_list resources;	// struct wl_resource
+	struct wl_list clients;		// struct seat_connection *;
+	struct seat_connection *focus;
 };
 
-struct seat g_seat;
+static struct seat g_seat;
+
+struct seat_connection *
+seat_connection_new(struct wl_resource *seat)
+{
+	struct seat_connection * res;
+	res = xmalloc(sizeof(*res));
+	memset(res, 0, sizeof(*res));
+	res->seat = seat;
+
+	return res;
+}
+
+void
+seat_connection_delete(struct seat_connection *con)
+{
+	if (con->link.next != NULL) {
+		wl_list_remove(&con->link);
+	}
+	free(con);
+}
 
 static void
 pointer_set_cursor(struct wl_client *client, struct wl_resource *resource,
@@ -85,32 +104,57 @@ initialize_seat(struct seat *res)
 
 	libinput_udev_assign_seat(res->input, SEAT_NAME);
 	res->ifd = libinput_get_fd(res->input);
-	pvector_init(&res->kbd.devs, xrealloc);
-	pvector_init(&res->ptr.devs, xrealloc);
-	wl_list_init(&res->resources);
+	wl_list_init(&res->clients);
 }
 
 static void
 finalize_seat(struct seat *ps)
 {
+	struct seat_connection *con;
 	if (ps == NULL)
 		return;
 	if (ps->udev)
 		udev_unref(ps->udev);
 	if (ps->input)
 		libinput_unref(ps->input);
-	pvector_free(&ps->kbd.devs);
-	pvector_free(&ps->ptr.devs);
+	wl_list_for_each(con, &g_seat.clients, link) {
+		seat_connection_delete(con);
+	}
 }
 
 static int
-process_keyboard_event(struct libinput_event *ev)
+process_keyboard_event(struct amcs_compositor *ctx, struct libinput_event *ev)
 {
 	struct libinput_event_keyboard *k;
+	uint32_t serial;
+	uint32_t time, key;
+	enum libinput_key_state state;
+	enum wl_keyboard_key_state wlstate;
+
+	debug("focus = %p", g_seat.focus);
+
+	if (g_seat.focus == NULL || g_seat.focus->keyboard == NULL) {
+		warning("can't send keyboard event, no client keyboard connection");
+		return 1;
+	}
 
 	k = libinput_event_get_keyboard_event(ev);
-	debug("keyboard key pressed, FIXME");
 
+	time = libinput_event_keyboard_get_time(k);
+	key = libinput_event_keyboard_get_key(k);
+	state = libinput_event_keyboard_get_key_state(k);
+	if (state == LIBINPUT_KEY_STATE_RELEASED) {
+		wlstate = WL_KEYBOARD_KEY_STATE_RELEASED;
+	} else if (state == LIBINPUT_KEY_STATE_PRESSED) {
+		wlstate = WL_KEYBOARD_KEY_STATE_PRESSED;
+	} else {
+		warning("unknown key state %d", state);
+		return 1;
+	}
+
+	serial = wl_display_next_serial(ctx->display);
+	debug("send (time, key, wlstate) (%d, %d, %d)", time, key, wlstate);
+	wl_keyboard_send_key(g_seat.focus->keyboard, serial, time, key, wlstate);
 
 	//amcs_compositor_send_key(key);
 	/*
@@ -134,7 +178,7 @@ get_dev_caps(struct libinput_device *dev)
 static void
 update_capabilities(struct libinput_device *dev, int isAdd)
 {
-	struct wl_resource *resource;
+	struct seat_connection *con;
 	int caps;
 
 	assert(isAdd == 1 && "unimplemented yet");
@@ -142,8 +186,8 @@ update_capabilities(struct libinput_device *dev, int isAdd)
 	caps = get_dev_caps(dev);
 	if ((g_seat.capabilities | caps) !=  caps) {
 		g_seat.capabilities |= caps;
-		wl_list_for_each(resource, &g_seat.resources, link) {
-			wl_seat_send_capabilities(resource, g_seat.capabilities);
+		wl_list_for_each(con, &g_seat.clients, link) {
+			wl_seat_send_capabilities(con->seat, g_seat.capabilities);
 		}
 	}
 }
@@ -151,11 +195,11 @@ update_capabilities(struct libinput_device *dev, int isAdd)
 int
 notify_seat(int fd, uint32_t mask, void *data)
 {
-	struct amcs_ctx *ctx;
+	struct amcs_compositor *ctx;
 	struct seat *seat = &g_seat;
 	struct libinput_event *ev = NULL;
 
-	ctx = (struct amcs_ctx*) data;
+	ctx = (struct amcs_compositor *) data;
 	debug("notify_seat triggered");
 	libinput_dispatch(seat->input);
 	while ((ev = libinput_get_event(seat->input)) != NULL) {
@@ -173,7 +217,7 @@ notify_seat(int fd, uint32_t mask, void *data)
 			update_capabilities(dev, 0);
 			break;
 		case LIBINPUT_EVENT_KEYBOARD_KEY:
-			process_keyboard_event(ev);
+			process_keyboard_event(ctx, ev);
 			break;
 		case LIBINPUT_EVENT_POINTER_MOTION:
 			debug("mouse moved");
@@ -233,21 +277,29 @@ static const struct wl_seat_interface seat_interface = {
 static void
 unbind_seat(struct wl_resource *resource)
 {
-	wl_list_remove(wl_resource_get_link(resource));
+	struct seat_connection *con;
+	con = wl_resource_get_user_data(resource);
+	assert(con);
+	seat_connection_delete(con);
 }
 
 static void
 bind_seat(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 {
 	struct wl_resource *resource;
+	struct seat_connection *con;
 
-	debug("");
+	debug("client %p", client);
 
 	RESOURCE_CREATE(resource, client, &wl_seat_interface, version, id);
-	wl_resource_set_implementation(resource, &seat_interface,
-				       data, NULL);
 
-	wl_list_insert(&g_seat.resources, wl_resource_get_link(resource));
+	con = seat_connection_new(resource);
+
+	wl_resource_set_implementation(resource, &seat_interface,
+				       con, unbind_seat);
+
+	wl_list_insert(&g_seat.clients, &con->link);
+
 	if (g_seat.capabilities)
 		wl_seat_send_capabilities(resource, g_seat.capabilities);
 }
@@ -265,6 +317,29 @@ seat_init(struct amcs_compositor *ctx)
 	wl_event_loop_add_fd(ctx->evloop, g_seat.ifd, WL_EVENT_READABLE, notify_seat, ctx);
 
 	return 0;
+}
+
+int
+seat_focus(struct wl_resource *res)
+{
+	struct wl_client *owner;
+	struct seat_connection *con;
+
+	debug("");
+	owner = wl_resource_get_client(res);
+	assert(owner != NULL);
+	wl_list_for_each(con, &g_seat.clients, link) {
+		struct wl_client *seat_owner;
+		seat_owner = wl_resource_get_client(res);
+		assert(seat_owner != NULL);
+		if (seat_owner == owner) {
+			debug("change owner");
+			g_seat.focus = con;
+			return 0;
+		}
+	}
+	return 1;
+
 }
 
 int
