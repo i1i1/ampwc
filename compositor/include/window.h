@@ -56,6 +56,8 @@ struct amcs_win {
 	int x, y;
 
 	struct amcs_buf buf;
+
+	void *opaq;	//TODO: getter/setter ???
 	win_update_cb upd_cb;
 	void *upd_opaq;
 };
@@ -77,8 +79,9 @@ void amcs_wintree_free(struct amcs_wintree *wt);
 void amcs_wintree_set_screen(struct amcs_wintree *wt, struct amcs_screen *screen);
 int amcs_wintree_pass(struct amcs_wintree *wt, wintree_pass_cb cb, void *data);
 
-// amcs_win stuff
-struct amcs_win *amcs_win_new(struct amcs_wintree *par, win_update_cb cb, void *opaq);
+// create new window, associate with window another object (*opaq*)
+struct amcs_win *amcs_win_new(struct amcs_wintree *par, void *opaq,
+		win_update_cb upd, void *upd_opaq);
 void amcs_win_free(struct amcs_win *w);
 
 /*

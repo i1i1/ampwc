@@ -113,7 +113,7 @@ static const struct xdg_toplevel_interface toplevel_interface = {
 	.set_minimized = xsurf_set_minimized,
 };
 
-int
+static int
 window_update_cb(struct amcs_win *win, void *opaq)
 {
 	struct amcs_surface *surf;
@@ -167,9 +167,9 @@ window_init(struct amcs_surface *mysurf)
 	if (old == NULL) {
 		struct amcs_wintree *wt;
 		wt = pvector_get(&compositor_ctx.screen_roots, nroot);
-		mysurf->aw = amcs_win_new(wt, window_update_cb, mysurf);
+		mysurf->aw = amcs_win_new(wt, mysurf, window_update_cb, mysurf);
 	} else {
-		mysurf->aw = amcs_win_new(old->parent, window_update_cb, mysurf);
+		mysurf->aw = amcs_win_new(old->parent, mysurf, window_update_cb, mysurf);
 	}
 	pvector_set(&compositor_ctx.cur_wins, nroot, mysurf->aw);
 

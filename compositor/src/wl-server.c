@@ -52,6 +52,7 @@ amcs_surface_free(struct amcs_surface *surf)
 		amcs_win_orphain(surf->aw);
 
 	}
+	wl_array_release(&surf->surf_states);
 	free(surf);
 }
 

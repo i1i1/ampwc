@@ -216,7 +216,7 @@ amcs_wintree_remove_all(struct amcs_wintree *wt)
 }
 
 struct amcs_win *
-amcs_win_new(struct amcs_wintree *par, win_update_cb cb, void *opaq)
+amcs_win_new(struct amcs_wintree *par, void *opaq, win_update_cb upd, void *upd_opaq)
 {
 	struct amcs_win *res;
 
@@ -224,8 +224,9 @@ amcs_win_new(struct amcs_wintree *par, win_update_cb cb, void *opaq)
 	res = xmalloc(sizeof(*res));
 	memset(res, 0, sizeof(*res));
 	res->type = WT_WIN;
-	res->upd_cb = cb;
-	res->upd_opaq = opaq;
+	res->opaq = opaq;
+	res->upd_cb = upd;
+	res->upd_opaq = upd_opaq;
 	if (par)
 		amcs_wintree_insert(par, res, -1);
 
