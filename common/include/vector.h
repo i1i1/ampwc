@@ -35,6 +35,7 @@ void vector_free(vector *v);
 size_t vector_len(const vector *v);
 void *vector_data(const vector *v);
 
+//reserve and null space
 int vector_reserve(vector *v, int nmemb);
 void vector_set(vector *v, size_t idx, const void *val);
 void *vector_get(const vector *v, size_t idx);

@@ -216,7 +216,7 @@ amcs_wintree_remove_all(struct amcs_wintree *wt)
 }
 
 struct amcs_win *
-amcs_win_new(struct amcs_wintree *par, void *opaq, win_update_cb upd, void *upd_opaq)
+amcs_win_new(struct amcs_wintree *par, void *opaq, win_update_cb upd)
 {
 	struct amcs_win *res;
 
@@ -226,7 +226,6 @@ amcs_win_new(struct amcs_wintree *par, void *opaq, win_update_cb upd, void *upd_
 	res->type = WT_WIN;
 	res->opaq = opaq;
 	res->upd_cb = upd;
-	res->upd_opaq = upd_opaq;
 	if (par)
 		amcs_wintree_insert(par, res, -1);
 
@@ -251,7 +250,7 @@ _commit_cb(struct amcs_win *w, void *opaq)
 	if (w && w->type == WT_WIN && w->buf.dt) {
 		amcs_win_commit(w);
 		if (w->upd_cb) {
-			rc = w->upd_cb(w, w->upd_opaq);
+			rc = w->upd_cb(w, w->opaq);
 			assert(rc == 0 || "TODO: writeme");
 		}
 	}

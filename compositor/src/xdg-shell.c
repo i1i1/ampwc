@@ -27,13 +27,23 @@ xsurf_set_parent(struct wl_client *client, struct wl_resource *resource, struct 
 static void
 xsurf_set_title(struct wl_client *client, struct wl_resource *resource, const char *title)
 {
-	warning("");
+	struct amcs_surface *mysurf;
+
+	assert(title);
+	debug("");
+	mysurf = wl_resource_get_user_data(resource);
+	mysurf->title = title;
 }
 
 static void
 xsurf_set_app_id(struct wl_client *client, struct wl_resource *resource, const char *app_id)
 {
-	warning("");
+	struct amcs_surface *mysurf;
+
+	assert(app_id);
+	debug("");
+	mysurf = wl_resource_get_user_data(resource);
+	mysurf->app_id = app_id;
 }
 
 static void
@@ -147,6 +157,7 @@ window_update_cb(struct amcs_win *win, void *opaq)
 static void
 window_init(struct amcs_surface *mysurf)
 {
+	struct amcs_client *c;
 	struct amcs_win *old;
 	uint32_t serial;
 	uint32_t *newst;
@@ -167,9 +178,9 @@ window_init(struct amcs_surface *mysurf)
 	if (old == NULL) {
 		struct amcs_wintree *wt;
 		wt = pvector_get(&compositor_ctx.screen_roots, nroot);
-		mysurf->aw = amcs_win_new(wt, mysurf, window_update_cb, mysurf);
+		mysurf->aw = amcs_win_new(wt, mysurf, window_update_cb);
 	} else {
-		mysurf->aw = amcs_win_new(old->parent, mysurf, window_update_cb, mysurf);
+		mysurf->aw = amcs_win_new(old->parent, mysurf, window_update_cb);
 	}
 	pvector_set(&compositor_ctx.cur_wins, nroot, mysurf->aw);
 
@@ -180,6 +191,11 @@ window_init(struct amcs_surface *mysurf)
 
 	xdg_surface_send_configure(mysurf->xdgres, serial);
 	seat_focus(mysurf->xdgres);
+
+	c = amcs_get_client(mysurf->res);
+	assert(c && "can't locate client");
+
+	wl_surface_send_enter(mysurf->res, c->output);
 }
 
 static void
@@ -211,12 +227,12 @@ surf_ack_configure(struct wl_client *client,
 	mysurf = wl_resource_get_user_data(resource);
 
 	debug("serial = %d", serial);
-	assert(serial == mysurf->pending.xdg_serial);
+	//assert(serial == mysurf->pending.xdg_serial);
 }
 
 
 static const struct xdg_surface_interface surface_interface = {
-	.destroy = NULL,
+	.destroy = destroy,
 	.get_toplevel = surf_get_toplevel,
 	.get_popup = NULL,
 	.set_window_geometry = surf_set_window_geometry,

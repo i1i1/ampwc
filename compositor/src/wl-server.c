@@ -22,6 +22,25 @@
 
 struct amcs_compositor compositor_ctx = {0};
 
+struct amcs_client *
+amcs_client_new(struct wl_client *client)
+{
+	struct amcs_client *res;
+
+	res = xmalloc(sizeof(*res));
+	memset(res, 0, sizeof(*res));
+	res->client = client;
+	return res;
+}
+
+void
+amcs_client_free(struct amcs_client *c)
+{
+	free(c);
+}
+
+#define DEFAULT_TITLE "application"
+#define DEFAULT_APPID "app"
 struct amcs_surface *
 amcs_surface_new()
 {
@@ -30,6 +49,9 @@ amcs_surface_new()
 	res = xmalloc(sizeof(*res));
 	memset(res, 0, sizeof(*res));
 	wl_array_init(&res->surf_states);
+
+	res->app_id = DEFAULT_APPID;
+	res->title = DEFAULT_TITLE;
 
 	return res;
 }
@@ -60,12 +82,12 @@ static void
 sig_surfaces_redraw(struct wl_listener *listener, void *data)
 {
 	struct amcs_compositor *ctx = (struct amcs_compositor *) data;
-	struct amcs_surface *surf;
 	int i;
 
 	debug("");
 
 	/*
+	struct amcs_surface *surf;
 	wl_list_for_each(surf, &ctx->surfaces, link) {
 		debug("next surface %p", surf);
 	}
@@ -135,9 +157,16 @@ surf_damage(struct wl_client *client, struct wl_resource *resource,
 
 static void
 surf_frame(struct wl_client *client, struct wl_resource *resource,
-	uint32_t callback)
+	uint32_t id)
 {
-	debug("%p", resource);
+	struct wl_resource *res;
+	struct amcs_surface *mysurf;
+	mysurf = wl_resource_get_user_data(resource);
+
+	RESOURCE_CREATE(res, client, &wl_callback_interface, 1, id);
+	wl_resource_set_implementation(res, NULL, NULL, NULL);
+	mysurf->redraw_cb = res;
+	warning("%p", resource);
 }
 
 static void
@@ -300,15 +329,35 @@ static const struct wl_compositor_interface compositor_interface = {
 };
 
 static void
+unbind_compositor(struct wl_resource *resource)
+{
+	struct amcs_client *c;
+
+	debug("");
+	c = amcs_get_client(resource);
+	if (c == NULL) {
+		warning("unbind compositor error, can't locate client");
+		return;
+	}
+	wl_list_remove(&c->link);
+	amcs_client_free(c);
+}
+
+static void
 bind_compositor(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 {
 	struct wl_resource *resource;
+	struct amcs_compositor *ctx;
+	struct amcs_client *c;
 
 	debug("");
 
+	ctx = data;
 	RESOURCE_CREATE(resource, client, &wl_compositor_interface, version, id);
 	wl_resource_set_implementation(resource, &compositor_interface,
-				       data, NULL);
+				       data, unbind_compositor);
+	c = amcs_client_new(client);
+	wl_list_insert(&ctx->clients, &c->link);
 }
 
 static void
@@ -361,7 +410,6 @@ start_draw(void)
 		amcs_wintree_set_screen(rootarr[i], sarr[i]);
 	}
 	pvector_reserve(&ctx->cur_wins, pvector_len(&ctx->screens));
-	pvector_zero(&ctx->cur_wins);
 
 	amcs_udev_free_cardnames(cards);
 }
@@ -387,6 +435,36 @@ stop_draw(void)
 }
 
 static void
+data_dev_start_drag(struct wl_client *client,
+	struct wl_resource *resource, struct wl_resource *source,
+	struct wl_resource *origin, struct wl_resource *icon,
+	uint32_t serial)
+{
+	warning("");
+}
+
+static void
+data_dev_set_selection(struct wl_client *client,
+	struct wl_resource *resource, struct wl_resource *source,
+	uint32_t serial)
+{
+	warning("");
+}
+
+static void
+data_dev_release(struct wl_client *client,
+	struct wl_resource *resource)
+{
+	warning("");
+}
+
+static const struct wl_data_device_interface data_device_interface = {
+	.start_drag = data_dev_start_drag,
+	.set_selection = data_dev_set_selection,
+	.release = data_dev_release,
+};
+
+static void
 devman_create_data_source(struct wl_client *client,
 	struct wl_resource *resource, uint32_t id)
 {
@@ -397,7 +475,11 @@ static void
 devman_get_data_device(struct wl_client *client,
 	struct wl_resource *resource, uint32_t id, struct wl_resource *seat)
 {
-	warning("");
+	struct wl_resource *res;
+
+	debug("");
+	RESOURCE_CREATE(res, client, &wl_data_device_interface, wl_resource_get_version(resource), id);
+	wl_resource_set_implementation(res, &data_device_interface, resource, NULL);
 }
 
 static const struct wl_data_device_manager_interface data_device_manager_interface = {
@@ -424,7 +506,51 @@ device_manager_init(struct amcs_compositor *ctx)
 		return 1;
 	}
 	return 0;
+}
 
+static void
+output_release(struct wl_client *client,
+	struct wl_resource *resource)
+{
+	warning("");
+}
+
+static const struct wl_output_interface output_interface = {
+	.release = output_release,
+};
+
+static void
+bind_output(struct wl_client *client, void *data, uint32_t version, uint32_t id)
+{
+	struct wl_resource *resource;
+	struct amcs_compositor *ctx;
+	struct amcs_client *c;
+
+	ctx = data;
+
+	debug("");
+	RESOURCE_CREATE(resource, client, &wl_output_interface, version, id);
+	wl_resource_set_implementation(resource, &output_interface, data, NULL);
+	//FIXME: temporary shit code
+	wl_output_send_geometry(resource, 0, 0, 1024, 1024, 0,
+			"unknown", "unknown", WL_OUTPUT_TRANSFORM_NORMAL);
+	wl_output_send_mode(resource, 0, 1024, 1024, 60);
+	wl_output_send_scale(resource, 1);
+	wl_output_send_done(resource);
+	c = amcs_get_client(resource);
+	assert(c && "can't locate client");
+	c->output = resource;
+}
+
+static int
+output_init(struct amcs_compositor *ctx)
+{
+	ctx->output = wl_global_create(ctx->display, &wl_output_interface, 3, ctx, &bind_output);
+	if (!ctx->output) {
+		warning("can't create output interface");
+		return 1;
+	}
+	return 0;
 }
 
 int
@@ -473,7 +599,8 @@ amcs_compositor_init(struct amcs_compositor *ctx)
 
 	if (xdg_shell_init(ctx) != 0 ||
 	    seat_init(ctx) != 0 ||
-	    device_manager_init(ctx) != 0) {
+	    device_manager_init(ctx) != 0 ||
+	    output_init(ctx) != 0) {
 		goto finalize;
 	}
 
@@ -503,6 +630,28 @@ amcs_compositor_deinit(struct amcs_compositor *ctx)
 	seat_finalize(ctx);
 }
 
+struct amcs_client *
+amcs_get_client(struct wl_resource *res)
+{
+	struct wl_client *c;
+	struct amcs_client *iter;
+
+	if (res == NULL)
+		return NULL;
+
+	c = wl_resource_get_client(res);
+	debug("==== resource %p client %p", res, c);
+	
+	if (c == NULL)
+		return NULL;
+
+	wl_list_for_each(iter, &compositor_ctx.clients, link) {
+		debug("next iter = %p", iter);
+		if (iter->client == c)
+			return iter;
+	}
+	return NULL;
+}
 
 static void
 term_handler(int signo)

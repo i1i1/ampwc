@@ -72,6 +72,9 @@ vector_reserve(vector *v, int nmemb)
 	void *data;
 	assert(v);
 	if (nmemb <= v->maxnmemb) {
+		int sz;
+		sz = (v->maxnmemb - v->nmemb) * v->size;
+		memset(v->data + v->nmemb * v->size, 0, sz);
 		v->nmemb = nmemb;
 		return VECTOR_OK;
 	}

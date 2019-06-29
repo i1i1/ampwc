@@ -81,7 +81,7 @@ int amcs_wintree_pass(struct amcs_wintree *wt, wintree_pass_cb cb, void *data);
 
 // create new window, associate with window another object (*opaq*)
 struct amcs_win *amcs_win_new(struct amcs_wintree *par, void *opaq,
-		win_update_cb upd, void *upd_opaq);
+		win_update_cb upd);
 void amcs_win_free(struct amcs_win *w);
 
 /*

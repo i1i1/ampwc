@@ -12,6 +12,8 @@
 #include <wayland-server-core.h>
 #include <wayland-server-protocol.h>
 
+#include "xdg-shell-server.h"
+
 #include "common.h"
 #include "macro.h"
 #include "wl-server.h"
@@ -179,13 +181,20 @@ process_keyboard_event(struct amcs_compositor *ctx, struct libinput_event *ev)
 		wl_keyboard_send_enter(g_seat.focus->keyboard,
 			serial, surf->res, &arr);
 		wl_array_release(&arr);
+
+		wl_keyboard_send_key(g_seat.focus->keyboard,
+			wl_display_next_serial(ctx->display),
+			time, key, wlstate);
+
+		serial = wl_display_next_serial(ctx->display);
+		xdg_toplevel_send_configure(surf->xdgtopres, 0, 0, &surf->surf_states);
+		surf->pending.xdg_serial = serial;
+		xdg_surface_send_configure(surf->xdgres, serial);
+		if (surf->redraw_cb)
+			wl_callback_send_done(surf->redraw_cb, get_time());
 	}
 
 	debug("send (time, key, wlstate) (%d, %d, %d)", time, key, wlstate);
-	wl_keyboard_send_key(g_seat.focus->keyboard,
-		serial, time, key, wlstate);
-
-	//amcs_compositor_send_key(key);
 	/*
 	wl_keyboard_send_key(wl_resource_from_link(&g_seat.resources)
 	    WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP,;
@@ -296,6 +305,10 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource,
 	wl_resource_set_implementation(res, &keyboard_interface, resource, NULL);
 	assert(con->keyboard == NULL && "keyboard not null");
 	con->keyboard = res;
+	wl_keyboard_send_keymap(res, WL_KEYBOARD_KEYMAP_FORMAT_NO_KEYMAP, 0, 0);
+	wl_keyboard_send_repeat_info(res, 200, 200);
+	wl_keyboard_send_modifiers(res,
+			wl_display_next_serial(compositor_ctx.display), 0, 0, 0, 0);
 }
 
 static void
@@ -344,6 +357,7 @@ unbind_seat(struct wl_resource *resource)
 static void
 bind_seat(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 {
+	struct amcs_client *c;
 	struct wl_resource *resource;
 	struct seat_connection *con;
 
@@ -360,6 +374,10 @@ bind_seat(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 
 	if (g_seat.capabilities)
 		wl_seat_send_capabilities(resource, g_seat.capabilities);
+
+	c = amcs_get_client(resource);
+	assert(c && "can't get client");
+	c->seat = resource;
 }
 
 int
