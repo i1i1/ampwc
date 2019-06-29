@@ -149,6 +149,8 @@ window_update_cb(struct amcs_win *win, void *opaq)
 	serial = wl_display_next_serial(compositor_ctx.display);
 	surf->pending.xdg_serial = serial;
 	xdg_surface_send_configure(surf->xdgres, serial);
+	if (surf->redraw_cb)
+		wl_callback_send_done(surf->redraw_cb, get_time());
 
 	wl_array_release(&arr);
 	return 0;
@@ -216,7 +218,7 @@ static void
 surf_set_window_geometry(struct wl_client *client, struct wl_resource *resource,
 	int32_t x, int32_t y, int32_t width, int32_t height)
 {
-	debug("x = %d y = %d w = %d h = %d", x, y, width, height);
+	warning("x = %d y = %d w = %d h = %d", x, y, width, height);
 }
 
 static void

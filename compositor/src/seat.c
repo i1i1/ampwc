@@ -186,10 +186,6 @@ process_keyboard_event(struct amcs_compositor *ctx, struct libinput_event *ev)
 			wl_display_next_serial(ctx->display),
 			time, key, wlstate);
 
-		serial = wl_display_next_serial(ctx->display);
-		xdg_toplevel_send_configure(surf->xdgtopres, 0, 0, &surf->surf_states);
-		surf->pending.xdg_serial = serial;
-		xdg_surface_send_configure(surf->xdgres, serial);
 		if (surf->redraw_cb)
 			wl_callback_send_done(surf->redraw_cb, get_time());
 	}
