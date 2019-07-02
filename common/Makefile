@@ -9,7 +9,7 @@ include ../common/gener.mk
 
 $(PRE): $(XDG_PROTO)
 	$(call prettify, GEN, $@, \
-	    wayland-scanner code $< $@)
+	    wayland-scanner public-code $< $@)
 
 userclean:
 	$(call prettify, RM, $(PRE), \

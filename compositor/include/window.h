@@ -9,11 +9,11 @@
 #define DRIPATH "/dev/dri/"
 
 /*
- * amcs_wintree -- container for child windows / splits.
- * root wintree has no parent
+ * amcs_container -- container for child windows / splits.
+ * root container has no parent
  */
 struct amcs_win;
-struct amcs_wintree;
+struct amcs_container;
 struct amcs_screen;
 
 enum win_objtype {
@@ -21,19 +21,19 @@ enum win_objtype {
 	WT_WIN = 1,
 };
 
-enum wintree_type {
-	WINTREE_HSPLIT = 0,
-	WINTREE_VSPLIT,
+enum container_type {
+	CONTAINER_HSPLIT = 0,
+	CONTAINER_VSPLIT,
 };
 
-#define AMCS_WINTREE(v) ((struct amcs_wintree *)v)
-struct amcs_wintree {
+#define AMCS_CONTAINER(v) ((struct amcs_container *)v)
+struct amcs_container {
 	enum win_objtype type;
-	struct amcs_wintree *parent;
+	struct amcs_container *parent;
 	int w, h;
 	int x, y;
 
-	enum wintree_type wt;
+	enum container_type wt;
 	pvector subwins; // struct amcs_win *
 
 	struct amcs_screen *screen; // NOTE: Valid only for root wtree
@@ -50,7 +50,7 @@ typedef int (*win_update_cb)(struct amcs_win *w, void *opaq);
 #define AMCS_WIN(v) ((struct amcs_win *)v)
 struct amcs_win {
 	enum win_objtype type;
-	struct amcs_wintree *parent;
+	struct amcs_container *parent;
 
 	int w, h;
 	int x, y;
@@ -69,18 +69,18 @@ struct amcs_screen {
 	amcs_drm_card *card;
 };
 
-typedef int (*wintree_pass_cb)(struct amcs_win *w, void *opaq);
+typedef int (*container_pass_cb)(struct amcs_win *w, void *opaq);
 
 /* This functions may change amcs_win size. */
 
-struct amcs_wintree *amcs_wintree_new(struct amcs_wintree *par, enum wintree_type t);
-void amcs_wintree_free(struct amcs_wintree *wt);
+struct amcs_container *amcs_container_new(struct amcs_container *par, enum container_type t);
+void amcs_container_free(struct amcs_container *wt);
 
-void amcs_wintree_set_screen(struct amcs_wintree *wt, struct amcs_screen *screen);
-int amcs_wintree_pass(struct amcs_wintree *wt, wintree_pass_cb cb, void *data);
+void amcs_container_set_screen(struct amcs_container *wt, struct amcs_screen *screen);
+int amcs_container_pass(struct amcs_container *wt, container_pass_cb cb, void *data);
 
 // create new window, associate with window another object (*opaq*)
-struct amcs_win *amcs_win_new(struct amcs_wintree *par, void *opaq,
+struct amcs_win *amcs_win_new(struct amcs_container *par, void *opaq,
 		win_update_cb upd);
 void amcs_win_free(struct amcs_win *w);
 
@@ -88,18 +88,18 @@ void amcs_win_free(struct amcs_win *w);
  * Insert window into specified position
  * Thrid argument may be -1, for appending at the end of *wt*
  */
-int amcs_wintree_insert(struct amcs_wintree *wt, struct amcs_win *w, int pos);
-int amcs_wintree_remove(struct amcs_wintree *wt, struct amcs_win *w);
-void amcs_wintree_remove_all(struct amcs_wintree *wt);
-int amcs_wintree_remove_idx(struct amcs_wintree *wt, int pos);
-int amcs_wintree_pos(struct amcs_wintree *wt, struct amcs_win *w);
+int amcs_container_insert(struct amcs_container *wt, struct amcs_win *w, int pos);
+int amcs_container_remove(struct amcs_container *wt, struct amcs_win *w);
+void amcs_container_remove_all(struct amcs_container *wt);
+int amcs_container_remove_idx(struct amcs_container *wt, int pos);
+int amcs_container_pos(struct amcs_container *wt, struct amcs_win *w);
 
 //resize childs
-//int amcs_wintree_update(
+//int amcs_container_update(
 
 /* Common */
 
-int amcs_wintree_resize_subwins(struct amcs_wintree *wt);
+int amcs_container_resize_subwins(struct amcs_container *wt);
 int amcs_win_commit(struct amcs_win *w);
 int amcs_win_orphain(struct amcs_win *w);
 //int amcs_win_resize(struct amcs_win *w,);
@@ -108,6 +108,6 @@ int amcs_win_orphain(struct amcs_win *w);
 int amcs_screens_add(pvector *amcs_screens, const char *path);
 void amcs_screens_free(pvector *amcs_screens);
 
-void amcs_wintree_debug(struct amcs_wintree *wt);
+void amcs_container_debug(struct amcs_container *wt);
 //end
 #endif // _AWC_WINDOWS_H

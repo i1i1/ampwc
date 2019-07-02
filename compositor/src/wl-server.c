@@ -94,7 +94,7 @@ sig_surfaces_redraw(struct wl_listener *listener, void *data)
 	*/
 	for (i = 0; i < pvector_len(&ctx->screen_roots); i++) {
 		debug("next screen");
-		amcs_wintree_debug(pvector_get(&ctx->screen_roots, i));
+		amcs_container_debug(pvector_get(&ctx->screen_roots, i));
 	}
 
 }
@@ -369,7 +369,7 @@ start_draw(void)
 	struct amcs_compositor *ctx = &compositor_ctx;
 	int nroots, nscreens;
 	struct amcs_screen **sarr;
-	struct amcs_wintree **rootarr;
+	struct amcs_container **rootarr;
 
 	debug("start draw");
 	cards = amcs_udev_get_cardnames();
@@ -388,12 +388,12 @@ start_draw(void)
 	nroots = pvector_len(&ctx->screen_roots);
 	if (nroots < nscreens) {
 		int i;
-		struct amcs_wintree *wt;
+		struct amcs_container *wt;
 		sarr = pvector_data(&ctx->screens);
 		//initialize root trees for each unused screen
 		for (i = nroots; i < nscreens; i++) {
-			wt = amcs_wintree_new(NULL, WINTREE_VSPLIT);
-			amcs_wintree_set_screen(wt, sarr[i]);
+			wt = amcs_container_new(NULL, CONTAINER_VSPLIT);
+			amcs_container_set_screen(wt, sarr[i]);
 			pvector_push(&ctx->screen_roots, wt);
 		}
 	} else if (nroots > nscreens) {
@@ -407,7 +407,7 @@ start_draw(void)
 	sarr = pvector_data(&ctx->screens);
 	rootarr = pvector_data(&ctx->screen_roots);
 	for (i = 0; i < nscreens; i++) {
-		amcs_wintree_set_screen(rootarr[i], sarr[i]);
+		amcs_container_set_screen(rootarr[i], sarr[i]);
 	}
 	pvector_reserve(&ctx->cur_wins, pvector_len(&ctx->screens));
 
@@ -418,7 +418,7 @@ static void
 stop_draw(void)
 {
 	struct amcs_compositor *ctx = &compositor_ctx;
-	struct amcs_surface *surf;
+//	struct amcs_surface *surf;
 	int i;
 
 	debug("stop_draw nscreens %zd", pvector_len(&ctx->screens));
@@ -427,7 +427,7 @@ stop_draw(void)
 
 	amcs_screens_free(&ctx->screens);
 	for (i = 0; i < pvector_len(&ctx->screen_roots); i++) {
-		struct amcs_wintree *tmp;
+		struct amcs_container *tmp;
 		tmp = pvector_get(&ctx->screen_roots, i);
 		tmp->screen = NULL;
 	}
@@ -523,10 +523,10 @@ static void
 bind_output(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 {
 	struct wl_resource *resource;
-	struct amcs_compositor *ctx;
+//	struct amcs_compositor *ctx;
 	struct amcs_client *c;
 
-	ctx = data;
+//	ctx = data;
 
 	debug("");
 	RESOURCE_CREATE(resource, client, &wl_output_interface, version, id);
@@ -656,9 +656,10 @@ amcs_get_client(struct wl_resource *res)
 static void
 term_handler(int signo)
 {
-	struct sigaction act = {0};
+	struct sigaction act;
 	sigset_t set;
 
+	memset(&act, 0, sizeof(act));
 	sigemptyset(&set);
 	act.sa_handler = SIG_DFL;
 	sigaction(signo, &act, NULL);
@@ -672,9 +673,10 @@ int
 main(int argc, const char *argv[])
 {
 	int rc;
-	struct sigaction act = {0};
+	struct sigaction act;
 	sigset_t set;
 
+	memset(&act, 0, sizeof(act));
 	if (amcs_compositor_init(&compositor_ctx) != 0)
 		return 1;
 

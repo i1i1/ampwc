@@ -10,14 +10,14 @@ DEP =  $(subst src, build, $(_SRC:.c=.d))
 all: $(PRE) $(DEP) $(_OBJ) $(OUT)
 
 define prettify =
-	$(Q)for file in $(2) ; do printf "%-3s %s%s\n" $(1) $(PREF) $$file ; done
+	$(Q)for file in $(2) ; do printf "%5s\t%s%s\n" $(1) $(PREF) $$file ; done
 	$(Q)$(3)
 endef
 
 ifneq ($(OUT),)
 $(OUT): $(_OBJ) $(OBJ)
 	$(call prettify, LD, $@, \
-	    $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^)
+	    $(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS))
 endif
 
 $(DEP): $(PRE)

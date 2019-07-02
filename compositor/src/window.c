@@ -7,10 +7,10 @@
 #include "udev.h"
 #include "window.h"
 
-static struct amcs_wintree *
+static struct amcs_container *
 win_get_root(struct amcs_win *w)
 {
-	struct amcs_wintree *wt = AMCS_WINTREE(w);
+	struct amcs_container *wt = AMCS_CONTAINER(w);
 
 	assert(w);
 	while (wt->parent)
@@ -80,10 +80,10 @@ amcs_screens_free(pvector *amcs_screens)
 		pvector_pop(amcs_screens);
 }
 
-struct amcs_wintree *
-amcs_wintree_new(struct amcs_wintree *par, enum wintree_type t)
+struct amcs_container *
+amcs_container_new(struct amcs_container *par, enum container_type t)
 {
-	struct amcs_wintree *res;
+	struct amcs_container *res;
 
 	res = xmalloc(sizeof(*res));
 	memset(res, 0, sizeof(*res));
@@ -92,20 +92,20 @@ amcs_wintree_new(struct amcs_wintree *par, enum wintree_type t)
 	res->parent = par;
 	pvector_init(&res->subwins, xrealloc);
 
-	amcs_wintree_resize_subwins(par);
+	amcs_container_resize_subwins(par);
 	return res;
 }
 
 void
-amcs_wintree_free(struct amcs_wintree *wt)
+amcs_container_free(struct amcs_container *wt)
 {
 	assert(wt && wt->type == WT_TREE);
-	amcs_wintree_remove_all(wt);
+	amcs_container_remove_all(wt);
 	free(wt);
 }
 
 void
-amcs_wintree_set_screen(struct amcs_wintree *wt, struct amcs_screen *screen)
+amcs_container_set_screen(struct amcs_container *wt, struct amcs_screen *screen)
 {
 	assert(wt && wt->type == WT_TREE);
 
@@ -113,11 +113,11 @@ amcs_wintree_set_screen(struct amcs_wintree *wt, struct amcs_screen *screen)
 	wt->x = wt->y = 0;
 	wt->w = screen->w;
 	wt->h = screen->h;
-	amcs_wintree_resize_subwins(wt);
+	amcs_container_resize_subwins(wt);
 }
 
 int
-amcs_wintree_pass(struct amcs_wintree *wt, wintree_pass_cb cb, void *data)
+amcs_container_pass(struct amcs_container *wt, container_pass_cb cb, void *data)
 {
 	struct amcs_win **arr;
 	int i, rc;
@@ -135,7 +135,7 @@ amcs_wintree_pass(struct amcs_wintree *wt, wintree_pass_cb cb, void *data)
 		if (arr[i]->type == WT_WIN)
 			rc = cb(arr[i], data);
 		else if (arr[i]->type == WT_TREE)
-			rc = amcs_wintree_pass(AMCS_WINTREE(arr[i]), cb, data);
+			rc = amcs_container_pass(AMCS_CONTAINER(arr[i]), cb, data);
 		else
 			error(2, "should not reach");
 
@@ -146,19 +146,19 @@ amcs_wintree_pass(struct amcs_wintree *wt, wintree_pass_cb cb, void *data)
 }
 
 int
-amcs_wintree_insert(struct amcs_wintree *wt, struct amcs_win *w, int pos)
+amcs_container_insert(struct amcs_container *wt, struct amcs_win *w, int pos)
 {
 	assert(wt && wt->type == WT_TREE && w->type == WT_WIN);
 
 	debug("insert %p, into %p nsubwinds %zd", w, wt, pvector_len(&wt->subwins));
 	pvector_push(&wt->subwins, w);
 	w->parent = wt;
-	amcs_wintree_resize_subwins(wt);
+	amcs_container_resize_subwins(wt);
 	return 0;
 }
 
 int
-amcs_wintree_pos(struct amcs_wintree *wt, struct amcs_win *w)
+amcs_container_pos(struct amcs_container *wt, struct amcs_win *w)
 {
 	struct amcs_win **arr;
 	int i;
@@ -174,19 +174,19 @@ amcs_wintree_pos(struct amcs_wintree *wt, struct amcs_win *w)
 }
 
 int
-amcs_wintree_remove(struct amcs_wintree *wt, struct amcs_win *w)
+amcs_container_remove(struct amcs_container *wt, struct amcs_win *w)
 {
 	int pos;
 	assert(wt && wt->type == WT_TREE);
 
-	pos = amcs_wintree_pos(wt, w);
+	pos = amcs_container_pos(wt, w);
 	if (pos >= 0) {
 		struct amcs_win *w;
 		w = pvector_get(&wt->subwins, pos);
 		w->parent = NULL;
 
 		pvector_del(&wt->subwins, pos);
-		amcs_wintree_resize_subwins(wt);
+		amcs_container_resize_subwins(wt);
 		return 0;
 	}
 	error(2, "should not happen, programmer error");
@@ -194,17 +194,17 @@ amcs_wintree_remove(struct amcs_wintree *wt, struct amcs_win *w)
 }
 
 int
-amcs_wintree_remove_idx(struct amcs_wintree *wt, int pos)
+amcs_container_remove_idx(struct amcs_container *wt, int pos)
 {
 	assert(wt && wt->type == WT_TREE);
 
 	pvector_del(&wt->subwins, pos);
-	amcs_wintree_resize_subwins(wt);
+	amcs_container_resize_subwins(wt);
 	return 0;
 }
 
 void
-amcs_wintree_remove_all(struct amcs_wintree *wt)
+amcs_container_remove_all(struct amcs_container *wt)
 {
 	int i;
 	assert(wt && wt->type == WT_TREE);
@@ -212,11 +212,11 @@ amcs_wintree_remove_all(struct amcs_wintree *wt)
 	for (i = 0; i < pvector_len(&wt->subwins); i++) {
 		pvector_pop(&wt->subwins);
 	}
-	amcs_wintree_resize_subwins(wt);
+	amcs_container_resize_subwins(wt);
 }
 
 struct amcs_win *
-amcs_win_new(struct amcs_wintree *par, void *opaq, win_update_cb upd)
+amcs_win_new(struct amcs_container *par, void *opaq, win_update_cb upd)
 {
 	struct amcs_win *res;
 
@@ -227,7 +227,7 @@ amcs_win_new(struct amcs_wintree *par, void *opaq, win_update_cb upd)
 	res->opaq = opaq;
 	res->upd_cb = upd;
 	if (par)
-		amcs_wintree_insert(par, res, -1);
+		amcs_container_insert(par, res, -1);
 
 	return res;
 }
@@ -258,7 +258,7 @@ _commit_cb(struct amcs_win *w, void *opaq)
 }
 
 int
-amcs_wintree_resize_subwins(struct amcs_wintree *wt)
+amcs_container_resize_subwins(struct amcs_container *wt)
 {
 	int i, nwin, step;
 
@@ -269,7 +269,7 @@ amcs_wintree_resize_subwins(struct amcs_wintree *wt)
 	if (nwin == 0)
 		return 0;
 
-	if (wt->wt == WINTREE_HSPLIT) {
+	if (wt->wt == CONTAINER_HSPLIT) {
 		step = wt->h / nwin;
 	} else {
 		step = wt->w / nwin;
@@ -281,7 +281,7 @@ amcs_wintree_resize_subwins(struct amcs_wintree *wt)
 		struct amcs_win *tmp;
 		tmp = pvector_get(&wt->subwins, i);
 
-		if (wt->wt == WINTREE_HSPLIT) {
+		if (wt->wt == CONTAINER_HSPLIT) {
 			tmp->x = wt->x;
 			tmp->y = wt->y + i * step;
 			tmp->w = wt->w;
@@ -293,17 +293,17 @@ amcs_wintree_resize_subwins(struct amcs_wintree *wt)
 			tmp->h = wt->h;
 		}
 		if (tmp->type == WT_TREE) {
-			amcs_wintree_resize_subwins(AMCS_WINTREE(tmp));
+			amcs_container_resize_subwins(AMCS_CONTAINER(tmp));
 		}
 	}
-	amcs_wintree_pass(wt, _commit_cb, NULL);
+	amcs_container_pass(wt, _commit_cb, NULL);
 	return 0;
 }
 
 int
 amcs_win_commit(struct amcs_win *win)
 {
-	struct amcs_wintree *root;
+	struct amcs_container *root;
 	struct amcs_screen *screen;
 	int i, j, h, w;
 	size_t offset;
@@ -329,7 +329,7 @@ amcs_win_commit(struct amcs_win *win)
 int
 amcs_win_orphain(struct amcs_win *w)
 {
-	struct amcs_wintree *par;
+	struct amcs_container *par;
 
 	assert(w);
 	if (w->parent == NULL)
@@ -337,7 +337,7 @@ amcs_win_orphain(struct amcs_win *w)
 	par = w->parent;
 	w->parent = NULL;
 
-	amcs_wintree_remove(par, w);
+	amcs_container_remove(par, w);
 	return 0;
 }
 
@@ -351,11 +351,11 @@ _print_cb(struct amcs_win *w, void *opaq)
 }
 
 void
-amcs_wintree_debug(struct amcs_wintree *wt)
+amcs_container_debug(struct amcs_container *wt)
 {
 	if (wt == NULL)
 		return;
-	amcs_wintree_pass(wt, _print_cb, NULL);
+	amcs_container_pass(wt, _print_cb, NULL);
 }
 ////////
 

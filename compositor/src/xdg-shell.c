@@ -178,7 +178,7 @@ window_init(struct amcs_surface *mysurf)
 	nroot = 0;
 	old = pvector_get(&compositor_ctx.cur_wins, nroot);
 	if (old == NULL) {
-		struct amcs_wintree *wt;
+		struct amcs_container *wt;
 		wt = pvector_get(&compositor_ctx.screen_roots, nroot);
 		mysurf->aw = amcs_win_new(wt, mysurf, window_update_cb);
 	} else {
@@ -225,8 +225,8 @@ static void
 surf_ack_configure(struct wl_client *client,
 	struct wl_resource *resource, uint32_t serial)
 {
-	struct amcs_surface *mysurf;
-	mysurf = wl_resource_get_user_data(resource);
+//	struct amcs_surface *mysurf;
+//	mysurf = wl_resource_get_user_data(resource);
 
 	debug("serial = %d", serial);
 	//assert(serial == mysurf->pending.xdg_serial);
