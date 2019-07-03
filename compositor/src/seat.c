@@ -163,14 +163,17 @@ process_keyboard_event(struct amcs_compositor *ctx, struct libinput_event *ev)
 		warning("unknown key state %d", state);
 		return 1;
 	}
+
+	struct amcs_screen *s;
 	struct amcs_win *w;
 	struct amcs_surface *surf;
 	struct wl_array arr;
 
 
-	if (pvector_len(&ctx->cur_wins) == 0)
+	if (pvector_len(&ctx->screens) == 0)
 		return 1;
-	w = pvector_get(&ctx->cur_wins, 0);
+	s = pvector_get(&ctx->screens, 0);
+	w = s->curwin;
 	serial = wl_display_next_serial(ctx->display);
 	if (w != NULL && w->opaq != NULL) {
 		debug("send enter");

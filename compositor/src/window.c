@@ -53,6 +53,8 @@ amcs_screens_add(pvector *amcs_screens, const char *path)
 		screen->pitch = dev_list->pitch;
 		screen->buf = dev_list->buf;
 		screen->card = card;
+		screen->root = NULL;
+		screen->curwin = NULL;
 		pvector_push(amcs_screens, screen);
 
 		card = NULL; // set card only for first screen

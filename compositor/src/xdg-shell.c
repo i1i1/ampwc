@@ -160,7 +160,7 @@ static void
 window_init(struct amcs_surface *mysurf)
 {
 	struct amcs_client *c;
-	struct amcs_win *old;
+	struct amcs_screen *s;
 	uint32_t serial;
 	uint32_t *newst;
 
@@ -176,20 +176,20 @@ window_init(struct amcs_surface *mysurf)
 	//TODO: choose screen
 	int nroot;
 	nroot = 0;
-	old = pvector_get(&compositor_ctx.cur_wins, nroot);
-	if (old == NULL) {
-		struct amcs_container *wt;
-		wt = pvector_get(&compositor_ctx.screen_roots, nroot);
-		mysurf->aw = amcs_win_new(wt, mysurf, window_update_cb);
-	} else {
-		mysurf->aw = amcs_win_new(old->parent, mysurf, window_update_cb);
-	}
-	pvector_set(&compositor_ctx.cur_wins, nroot, mysurf->aw);
+
+	s = pvector_get(&compositor_ctx.screens, nroot);
+	mysurf->aw = amcs_win_new((s->curwin == NULL ? s->root : s->curwin->parent),
+				  mysurf,
+				  window_update_cb);
+	s->curwin = mysurf->aw;
 
 	mysurf->w = mysurf->aw->w;
 	mysurf->h = mysurf->aw->h;
 
-	xdg_toplevel_send_configure(mysurf->xdgtopres, mysurf->w, mysurf->h, &mysurf->surf_states);
+	xdg_toplevel_send_configure(mysurf->xdgtopres,
+				    mysurf->w,
+				    mysurf->h,
+				    &mysurf->surf_states);
 
 	xdg_surface_send_configure(mysurf->xdgres, serial);
 	seat_focus(mysurf->xdgres);

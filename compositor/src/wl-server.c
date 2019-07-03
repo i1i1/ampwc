@@ -61,14 +61,14 @@ amcs_surface_free(struct amcs_surface *surf)
 {
 	struct amcs_compositor *ctx = &compositor_ctx;
 	if (surf->aw) {
-		struct amcs_win *w;
+		struct amcs_screen *s;
 
 		//TODO: choose screen, choose another window
 		int nroot;
 		nroot = 0;
-		w = pvector_get(&ctx->cur_wins, nroot);
-		if (surf->aw == w) {
-			pvector_set(&ctx->cur_wins, nroot, NULL);
+		s = pvector_get(&ctx->screens, nroot);
+		if (surf->aw == s->curwin) {
+			s->curwin = NULL;
 		}
 
 		amcs_win_orphain(surf->aw);
@@ -92,9 +92,10 @@ sig_surfaces_redraw(struct wl_listener *listener, void *data)
 		debug("next surface %p", surf);
 	}
 	*/
-	for (i = 0; i < pvector_len(&ctx->screen_roots); i++) {
+	for (i = 0; i < pvector_len(&ctx->screens); i++) {
+		struct amcs_screen *s = pvector_get(&ctx->screens, i);
 		debug("next screen");
-		amcs_container_debug(pvector_get(&ctx->screen_roots, i));
+		amcs_container_debug(s->root);
 	}
 
 }
@@ -367,9 +368,7 @@ start_draw(void)
 	char path[PATH_MAX];
 	const char **cards;
 	struct amcs_compositor *ctx = &compositor_ctx;
-	int nroots, nscreens;
-	struct amcs_screen **sarr;
-	struct amcs_container **rootarr;
+	int nscreens;
 
 	debug("start draw");
 	cards = amcs_udev_get_cardnames();
@@ -385,32 +384,18 @@ start_draw(void)
 	if (nscreens == 0)
 		error(1, "screens not found");
 
-	nroots = pvector_len(&ctx->screen_roots);
-	if (nroots < nscreens) {
-		int i;
+	struct amcs_screen *s;
+
+	for (int i = 0; i < nscreens; i++) {
 		struct amcs_container *wt;
-		sarr = pvector_data(&ctx->screens);
-		//initialize root trees for each unused screen
-		for (i = nroots; i < nscreens; i++) {
+		s = pvector_get(&ctx->screens, i);
+
+		if (s->root) {
 			wt = amcs_container_new(NULL, CONTAINER_VSPLIT);
-			amcs_container_set_screen(wt, sarr[i]);
-			pvector_push(&ctx->screen_roots, wt);
+			amcs_container_set_screen(wt, s);
 		}
-	} else if (nroots > nscreens) {
-		error(2, "TODO: Writeme!");
+		amcs_container_set_screen(s->root, s);
 	}
-
-	nscreens = pvector_len(&ctx->screens);
-	nroots = pvector_len(&ctx->screen_roots);
-	assert(nscreens == nroots);
-
-	sarr = pvector_data(&ctx->screens);
-	rootarr = pvector_data(&ctx->screen_roots);
-	for (i = 0; i < nscreens; i++) {
-		amcs_container_set_screen(rootarr[i], sarr[i]);
-	}
-	pvector_reserve(&ctx->cur_wins, pvector_len(&ctx->screens));
-
 	amcs_udev_free_cardnames(cards);
 }
 
@@ -426,10 +411,9 @@ stop_draw(void)
 		return;
 
 	amcs_screens_free(&ctx->screens);
-	for (i = 0; i < pvector_len(&ctx->screen_roots); i++) {
-		struct amcs_container *tmp;
-		tmp = pvector_get(&ctx->screen_roots, i);
-		tmp->screen = NULL;
+	for (i = 0; i < pvector_len(&ctx->screens); i++) {
+		struct amcs_screen *s = pvector_get(&ctx->screens, i);
+		s->root->screen = NULL;
 	}
 	pvector_clear(&ctx->screens);
 }
@@ -610,8 +594,6 @@ amcs_compositor_init(struct amcs_compositor *ctx)
 	wl_signal_add(&ctx->redraw_sig, &ctx->redraw_listener);
 
 	pvector_init(&ctx->screens, xrealloc);
-	pvector_init(&ctx->screen_roots, xrealloc);
-	pvector_init(&ctx->cur_wins, xrealloc);
 
 	return 0;
 finalize:

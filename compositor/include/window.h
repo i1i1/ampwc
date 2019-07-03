@@ -67,6 +67,8 @@ struct amcs_screen {
 	int pitch;
 	uint8_t *buf;
 	amcs_drm_card *card;
+	struct amcs_container *root;
+	struct amcs_win *curwin;
 };
 
 typedef int (*container_pass_cb)(struct amcs_win *w, void *opaq);

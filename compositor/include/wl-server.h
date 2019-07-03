@@ -55,8 +55,6 @@ struct amcs_compositor {
 
 	//
 	pvector screens;	// struct amcs_screen *
-	pvector screen_roots;	// struct amcs_wtree *
-	pvector cur_wins;	//struct amcs_win *
 
 	struct wl_listener redraw_listener;
 	struct wl_signal redraw_sig;
